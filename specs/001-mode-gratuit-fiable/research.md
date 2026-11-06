@@ -98,7 +98,8 @@ modèle : sa gratuité dépend du compte, et seul l'utilisateur peut l'affirmer.
 
 Limite acceptée : un passage au payant n'est détecté qu'au lancement de `free-check`. Pour un slug
 `:free`, un retrait produit une erreur et non une facturation. Le routeur `openrouter/free` est
-accepté d'après son nom et son tarif, à reconfirmer à l'implémentation.
+accepté d'après son nom et son tarif : le 2026-11-06, `GET /api/v1/models` le liste avec `prompt` et
+`completion` à `0`, `free-check` le signale `ok`, et une génération réelle a réussi par cette seule route.
 
 **Alternatives considered**: appel réseau à chaque démarrage (ralentit le lancement et rend le
 chargement dépendant du réseau).

@@ -49,7 +49,9 @@ valeur d'identifiant n'apparaît.
 ## Bascule réelle
 
 Placer en tête de `routes` un slug `:free` retiré du catalogue, en l'ajoutant aussi à `models` dans
-`llm-pi-ai:`. Sans cet ajout, le démarrage échoue avec `FREE_MODE_ROUTE_UNUSABLE`. Puis lancer :
+`llm-pi-ai:`, et régler `api: openai-completions` sur le fournisseur `openrouter`, car un slug absent du
+catalogue installé n'hérite d'aucune API. Sans ces ajouts, le démarrage échoue avec
+`FREE_MODE_ROUTE_UNUSABLE`. Puis lancer :
 
 ```sh
 pnpm dsh --profile headless "Réponds uniquement : ok"

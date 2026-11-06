@@ -143,9 +143,12 @@ export async function checkRoute(
     await llm.resolveCallConfig({ provider: route.provider, model: route.model })
   } catch (error: unknown) {
     if (!(error instanceof LlmError)) throw error
-    return error.code === 'NO_ADAPTER'
-      ? issue(route, 'provider-unknown', 'FREE_MODE_ROUTE_UNUSABLE', 'names an unknown provider; configure it under `llm-pi-ai`')
-      : issue(route, 'model-not-configured', 'FREE_MODE_ROUTE_UNUSABLE', 'is not configured; add the model to its provider under `llm-pi-ai`')
+    if (error.code === 'NO_ADAPTER') {
+      return issue(route, 'provider-unknown', 'FREE_MODE_ROUTE_UNUSABLE', 'names an unknown provider; configure it under `llm-pi-ai`')
+    }
+    return issue(route, 'model-not-configured', 'FREE_MODE_ROUTE_UNUSABLE', error.code === 'UNKNOWN_MODEL'
+      ? 'is not configured; add the model to its provider under `llm-pi-ai`'
+      : `cannot be resolved: ${error.message}`)
   }
   if (llm.providerRetryPolicy(route.provider).mode === 'always') {
     return issue(route, 'unbounded-retry', 'FREE_MODE_UNBOUNDED_RETRY', 'uses `retryPolicy.mode: always`; use `normal` so failover can start')

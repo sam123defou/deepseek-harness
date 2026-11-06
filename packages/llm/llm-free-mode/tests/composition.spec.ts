@@ -413,6 +413,20 @@ describe('real Loader composition', () => {
     await expect(loaded.freeMode.checkRoutes()).resolves.toHaveLength(4)
   })
 
+  it('names the provider configuration error of a listed model', { timeout: 60_000 }, async () => {
+    const loaded = await load()
+    class MisconfiguredAdapter extends ScriptedAdapter {
+      override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        if (model === 'second:free') throw new LlmError('model "second:free" needs an api', 'INVALID_CONFIG')
+        return super.resolveModel(provider, model)
+      }
+    }
+    loaded.llm.registerAdapter(['openrouter', 'groq'], new MisconfiguredAdapter({}))
+    const [found] = await loaded.freeMode.checkRoutes()
+    expect(found?.problem).toBe('model-not-configured')
+    expect(found?.message).toContain('cannot be resolved: model "second:free" needs an api')
+  })
+
   it('does not hide an unexpected adapter error', { timeout: 60_000 }, async () => {
     const loaded = await load()
     class Broken extends ScriptedAdapter {
