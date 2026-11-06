@@ -255,6 +255,24 @@ describe('ApiSession Agent lookup and recovery', () => {
   })
 })
 
+describe('ApiSession Agent composition', () => {
+  it('waits for the Loader so startup guards exist before any Agent runs', async () => {
+    const { ctx, agents } = await harness()
+    let settle = (): void => undefined
+    const settled = new Promise<void>((resolve) => { settle = resolve })
+    ctx.provide('loader', { await: () => settled } as never)
+    const finished = vi.fn()
+
+    const composed = agents.composeAgent(undefined).then(finished)
+    await new Promise(resolve => setImmediate(resolve))
+    expect(finished).not.toHaveBeenCalled()
+
+    settle()
+    await composed
+    expect(finished).toHaveBeenCalledOnce()
+  })
+})
+
 describe('ApiSession model selection', () => {
   it('requires the model-selection projection', async () => {
     const { ctx, agents } = await harness()

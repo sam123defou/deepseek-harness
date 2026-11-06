@@ -1,0 +1,19 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../../../vendor/loader"
+    },
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../boot/cmdline" },
+    { "path": "../../llm/llm" },
+    { "path": "../../llm/llm-free-mode" }
+  ]
+}

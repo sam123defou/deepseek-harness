@@ -25,6 +25,51 @@ import type {
   SystemPromptUpdate,
 } from '@deepseek-ai/dsh-llm'
 
+describe('route guards', () => {
+  const route = { provider: 'p', model: 'm' }
+  const refuse = () => { throw new LlmError('refused', 'FREE_MODE_ROUTE_REFUSED') }
+
+  async function runtime(): Promise<{ ctx: Context; adapter: CountingAdapter }> {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const adapter = new CountingAdapter()
+    ctx.llm.registerAdapter(['p'], adapter)
+    return { ctx, adapter }
+  }
+
+  class CountingAdapter extends LlmAdapter {
+    calls = 0
+    async * stream(): AsyncIterable<StreamChunk> {
+      this.calls += 1
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    }
+  }
+
+  it('refuses in prepareCall and in checkRoute until disposed', async () => {
+    const { ctx } = await runtime()
+    const dispose = ctx.llm.registerRouteGuard(refuse)
+    await expect(ctx.llm.prepareCall(route)).rejects.toMatchObject({ code: 'FREE_MODE_ROUTE_REFUSED' })
+    await expect(ctx.llm.checkRoute(route)).rejects.toThrow('refused')
+    dispose()
+    await expect(ctx.llm.checkRoute(route)).resolves.toBeUndefined()
+    await expect(ctx.llm.prepareCall(route)).resolves.toBeDefined()
+  })
+
+  it('refuses a direct stream without reaching the adapter', async () => {
+    const { ctx, adapter } = await runtime()
+    ctx.llm.registerRouteGuard(refuse)
+    const chunks: StreamChunk[] = []
+    for await (const chunk of ctx.llm.stream({ ...route, messages: [] })) chunks.push(chunk)
+    expect(adapter.calls).toBe(0)
+    expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'error', failure: { code: 'FREE_MODE_ROUTE_REFUSED' } } })
+  })
+
+  it('reports provider access facts through the runtime', async () => {
+    const { ctx } = await runtime()
+    expect(ctx.llm.providerAccess('p')).toBeUndefined()
+  })
+})
+
 class ScriptedAdapter extends LlmAdapter {
   constructor(private script: StreamChunk[]) {
     super()

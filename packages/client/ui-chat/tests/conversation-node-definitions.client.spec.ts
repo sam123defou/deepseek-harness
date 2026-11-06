@@ -19,6 +19,7 @@ import { assistantDefinition } from '../src/client/conversation-nodes/assistant.
 import { chatViewDefinition } from '../src/client/conversation-nodes/chat-snapshot-builder.ts'
 import { commandDefinition } from '../src/client/conversation-nodes/command.ts'
 import { compactionDefinition } from '../src/client/conversation-nodes/compaction.ts'
+import { failoverDefinition } from '../src/client/conversation-nodes/failover.ts'
 import { unknownFallbackDefinition } from '../src/client/conversation-nodes/fallback.ts'
 import { nextStepInboxDefinition } from '../src/client/conversation-nodes/inbox.ts'
 import { messageDefinition } from '../src/client/conversation-nodes/message.ts'
@@ -45,6 +46,7 @@ const DEFINITIONS: readonly ConversationNodeDefinition[] = [
   commandDefinition,
   compactionDefinition,
   retryDefinition,
+  failoverDefinition,
   turnErrorDefinition,
   turnMaxTokensDefinition,
   turnTailDefinition,
@@ -2055,6 +2057,49 @@ describe('built-in conversation node Definitions', () => {
     expect(node(current, 'context')).toBeUndefined()
     expect(node(current, 'assistant-step')).toBeUndefined()
     expect((node(current, 'tool-call')?.data as ToolChatData).root).not.toHaveProperty('kind')
+  })
+
+  it('drops the abandoned attempt on a route change and keeps one row per failover record', () => {
+    const failover = {
+      turn: 1,
+      step: 1,
+      from: { provider: 'openrouter', model: 'first:free' },
+      cause: 'saturated',
+      failureCode: 'SERVER',
+      delayMs: 0,
+    } as const
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/live-chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: 'abandoned attempt' },
+      }),
+    ])
+    expect((node(snapshot(value), 'assistant-step')?.data as AssistantChatData).blocks)
+      .toEqual([{ kind: 'text', text: 'abandoned attempt' }])
+
+    value.append(at(4, 'llm/failover', { ...failover, to: { provider: 'groq', model: 'next' } }))
+    value.append(at(5, 'assistant/live-chunk', {
+      turn: 1,
+      step: 1,
+      chunk: { type: 'text-delta', index: 0, text: 'replacement reply' },
+    }))
+    value.flush()
+    expect((node(snapshot(value), 'assistant-step')?.data as AssistantChatData).blocks)
+      .toEqual([{ kind: 'text', text: 'replacement reply' }])
+    expect(node(snapshot(value), 'model-failover')).toMatchObject({
+      anchorSeq: 4,
+      data: { seq: 4, cause: 'saturated', to: { provider: 'groq', model: 'next' } },
+    })
+
+    value.append(at(6, 'llm/failover', { ...failover, from: { provider: 'groq', model: 'next' } }))
+    value.flush()
+    const rows = snapshot(value).nodes.values().filter(candidate => candidate.kind === 'model-failover')
+    expect(rows.map(row => row.anchorSeq)).toEqual([4, 6])
+    expect((node(snapshot(value), 'assistant-step')?.data as AssistantChatData).blocks)
+      .toEqual([{ kind: 'text', text: 'replacement reply' }])
   })
 
   it('assembles retry chains and keeps manual and automatic compaction ownership separate', () => {

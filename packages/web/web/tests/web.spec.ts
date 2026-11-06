@@ -15,7 +15,7 @@ function makeSearchProvider(
   available: boolean,
   search: (request: WebSearchRequest) => Promise<WebSearchResult>,
 ): WebSearchProvider {
-  return { id, available: () => available, search: request => search(request) }
+  return { id, billing: 'free', available: () => available, search: request => search(request) }
 }
 
 function makeFetchProvider(id: string, available: boolean, result: WebFetchResult): WebFetchProvider {
@@ -39,6 +39,25 @@ async function mountWeb(config: ConstructorParameters<typeof WebRuntime>[1] = {}
   await ctx.plugin(WebRuntime, config)
   return { ctx, web: ctx.web }
 }
+
+describe('WebRuntime search guards', () => {
+  it('refuses inside search, for a configured provider too, until disposed', async () => {
+    const { web } = await mountWeb({ searchProvider: 'exa' })
+    let searches = 0
+    web.registerSearchProvider(makeSearchProvider('exa', available, () => {
+      searches += 1
+      return Promise.resolve(searchResult('exa'))
+    }))
+    const dispose = web.registerSearchGuard((provider) => {
+      throw new WebError(`refused ${provider.id}`, 'WEB_PROVIDER_REFUSED_FREE_MODE')
+    })
+    await expect(web.search({ query: 'x' })).rejects.toMatchObject({ code: 'WEB_PROVIDER_REFUSED_FREE_MODE' })
+    expect(searches).toBe(0)
+    dispose()
+    await web.search({ query: 'x' })
+    expect(searches).toBe(1)
+  })
+})
 
 describe('WebRuntime registration', () => {
   it('registers a search provider and unregisters it via the returned disposer', async () => {
@@ -147,6 +166,7 @@ describe('WebRuntime execution resolution', () => {
     const seen: (AbortSignal | undefined)[] = []
     web.registerSearchProvider({
       id: 'exa',
+      billing: 'free',
       available: () => available,
       search: (_request, signal) => { seen.push(signal); return Promise.resolve(searchResult('exa')) },
     })

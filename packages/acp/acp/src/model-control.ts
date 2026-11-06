@@ -43,7 +43,13 @@ export class AcpModelControl {
   ) {
     this.selected = initial
     const getCurrent = (): ModelSelection | undefined => this.turnSelection?.selection ?? this.selected
-    const setCurrent = (value: ModelSelection | undefined): void => { this.selected = value }
+    const setCurrent = (value: ModelSelection | undefined): void => {
+      this.selected = value
+      // A reroute replaces the pinned route too, or the next step would return to the failed model.
+      if (value !== undefined && this.turnSelection !== undefined) {
+        this.turnSelection = { turn: this.turnSelection.turn, selection: value }
+      }
+    }
     this.selection = {
       get current() { return getCurrent() },
       set current(value) { setCurrent(value) },
@@ -109,6 +115,7 @@ export class AcpModelControl {
         const state = await this.state(signal)
         const selected = state.choices.get(value)
         if (selected === undefined) throw new AcpModelConfigError(`unknown model option: ${value}`)
+        await this.llm.checkRoute(selected)
         await this.resolveSelection(selected, signal)
         this.selected = selected
       } else if (configId === REASONING_CONFIG_ID) {

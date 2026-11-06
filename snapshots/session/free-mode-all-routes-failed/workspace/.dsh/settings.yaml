@@ -1,0 +1,9 @@
+llm-free-mode:
+  enabled: true
+  routes:
+    - provider: deepseek-official
+      model: deepseek-v4-flash
+      freeTierConfirmed: true
+    - provider: deepseek-official
+      model: deepseek-v4-pro
+      freeTierConfirmed: true

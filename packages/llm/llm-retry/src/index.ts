@@ -12,6 +12,7 @@ import { z as zod } from 'zod'
 import type { Agent, RequestErrorAction } from '@deepseek-ai/dsh-agent'
 import type { LlmFailure, ResolvedRetryPolicy } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-session-projection'
+import { cancellableDelay } from '@deepseek-ai/dsh-timeout'
 import { RetryId } from './brand.ts'
 import type { LlmRetryEventData } from './types.ts'
 
@@ -78,21 +79,6 @@ function retryPolicyKey(policy: ResolvedRetryPolicy): string {
 
 function retryStateKey(provider: string, policyKey: string): string {
   return JSON.stringify([provider, policyKey])
-}
-
-function cancellableDelay(delayMs: number, signal: AbortSignal): Promise<boolean> {
-  if (signal.aborted) return Promise.resolve(false)
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort)
-      resolve(true)
-    }, delayMs)
-    function onAbort(): void {
-      clearTimeout(timer)
-      resolve(false)
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
 }
 
 /**

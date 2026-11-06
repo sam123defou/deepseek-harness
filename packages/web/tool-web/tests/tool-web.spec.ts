@@ -32,7 +32,7 @@ const testToolSignal = new AbortController().signal
 const available = true
 
 function searchProvider(result: WebSearchResult, isAvailable = available): WebSearchProvider {
-  return { id: 'stub-search', available: () => isAvailable, search: () => Promise.resolve(result) }
+  return { id: 'stub-search', billing: 'free', available: () => isAvailable, search: () => Promise.resolve(result) }
 }
 
 /** Mount the real registry, seam, and tool-web; return an executor helper. */
@@ -536,6 +536,7 @@ describe('tool-web execution through the real registry', () => {
     })
     const provider: WebSearchProvider = {
       id: 'stub-search',
+      billing: 'free',
       available: () => available,
       search: (request) => {
         seen.push(request.query)
@@ -576,6 +577,7 @@ describe('tool-web execution through the real registry', () => {
   it('continues round-robin merging after a shorter result is exhausted', async () => {
     const provider: WebSearchProvider = {
       id: 'stub-search',
+      billing: 'free',
       available: () => available,
       search: request => Promise.resolve(request.query === 'one'
         ? { content: '', sources: [{ url: 'https://a.test' }], truncated: false }
@@ -600,6 +602,7 @@ describe('tool-web execution through the real registry', () => {
     let releaseSibling: (() => void) | undefined
     const provider: WebSearchProvider = {
       id: 'stub-search',
+      billing: 'free',
       available: () => available,
       search: (request, signal) => {
         if (request.query === 'one') return Promise.reject(new Error('first search failed'))
@@ -631,6 +634,7 @@ describe('tool-web execution through the real registry', () => {
   it('caps combined multi-query results to searchMaxResults', async () => {
     const provider: WebSearchProvider = {
       id: 'stub-search',
+      billing: 'free',
       available: () => available,
       search: request => Promise.resolve({
         sources: request.query === 'one'
@@ -693,7 +697,7 @@ describe('tool-web execution through the real registry', () => {
 
   it('surfaces WEB_PROVIDER_AMBIGUOUS for multiple unconfigured providers', async () => {
     const { ctx, fiber, call } = await mountTools({ search: searchProvider({ sources: [], truncated: false }) })
-    ctx.web.registerSearchProvider({ id: 'other', available: () => available, search: () => Promise.resolve({ sources: [], truncated: false }) })
+    ctx.web.registerSearchProvider({ id: 'other', billing: 'free', available: () => available, search: () => Promise.resolve({ sources: [], truncated: false }) })
     const out = await call('web_search', { queries: ['q'] })
     expect(out.isError).toBe(true)
     expect(out.error?.info?.code).toBe('WEB_PROVIDER_AMBIGUOUS')
@@ -769,6 +773,7 @@ describe('tool-web execution through the real registry', () => {
     const seen: { signal?: AbortSignal | undefined } = {}
     const provider: WebSearchProvider = {
       id: 'stub-search',
+      billing: 'free',
       available: () => available,
       search: (_request, signal) => { seen.signal = signal; return Promise.resolve({ sources: [], truncated: false }) },
     }
@@ -783,6 +788,7 @@ describe('tool-web execution through the real registry', () => {
     const signals: (AbortSignal | undefined)[] = []
     const provider: WebSearchProvider = {
       id: 'stub-search',
+      billing: 'free',
       available: () => available,
       search: (_request, signal) => {
         signals.push(signal)
@@ -809,6 +815,7 @@ describe('searchMaxResults is plugin config', () => {
     const seen: { maxResults?: number | undefined } = {}
     const provider: WebSearchProvider = {
       id: 'stub-search',
+      billing: 'free',
       available: () => available,
       search: (request) => { seen.maxResults = request.maxResults; return Promise.resolve({ sources: [], truncated: false }) },
     }
@@ -822,6 +829,7 @@ describe('searchMaxResults is plugin config', () => {
     const sources = Array.from({ length: 5 }, (_, i) => ({ url: `https://s${i}.test` }))
     const provider: WebSearchProvider = {
       id: 'stub-search',
+      billing: 'free',
       available: () => available,
       search: () => Promise.resolve({ sources, truncated: false }),
     }
@@ -854,6 +862,7 @@ describe('searchMaxQueries is plugin config', () => {
     const seen: string[] = []
     const provider: WebSearchProvider = {
       id: 'stub-search',
+      billing: 'free',
       available: () => available,
       search: (request) => {
         seen.push(request.query)

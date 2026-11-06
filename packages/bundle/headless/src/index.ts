@@ -16,6 +16,7 @@ import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { describeFailover } from '@deepseek-ai/dsh-llm-free-mode'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
@@ -44,6 +45,8 @@ export const Config: z<Config> = z.object({
 interface RunOutcome {
   text: string
   reason: SessionEvent<'turn/end'>['data']['reason'] | undefined
+  /** One line per free-mode route change or stop, in log order. */
+  failovers: readonly string[]
 }
 
 /** Process-facing effects of one run: output streams plus the launcher's bounded exit request. */
@@ -65,6 +68,7 @@ function summarize(session: Session, firstSeq: SessionLogOffset): RunOutcome {
   let started = false
   let text = ''
   let reason: SessionEvent<'turn/end'>['data']['reason'] | undefined
+  const failovers: string[] = []
   const length = session.seq
   for (let seq = firstSeq; seq < length; seq++) {
     const event = session.eventAt(SessionSeq(seq))
@@ -83,9 +87,10 @@ function summarize(session: Session, firstSeq: SessionLogOffset): RunOutcome {
         .join('')
       if (joined !== '') text = joined
     }
+    if (event.type === 'llm/failover') failovers.push(describeFailover(event.data))
     if (event.type === 'turn/end') reason = event.data.reason
   }
-  return { text, reason }
+  return { text, reason, failovers }
 }
 
 /**
@@ -205,6 +210,7 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   await sessions.flush(agent.session)
   const outcome = summarize(agent.session, firstSeq)
   io.stdout.write(outcome.text + '\n')
+  for (const line of outcome.failovers) io.stderr.write(`dsh: ${line}\n`)
   if (outcome.reason?.kind === 'error') {
     io.stderr.write(`dsh: ${outcome.reason.error.code}: ${outcome.reason.error.message}\n`)
   }

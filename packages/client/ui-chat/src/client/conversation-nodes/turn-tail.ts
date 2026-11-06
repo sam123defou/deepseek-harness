@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConversationMatch, ConversationNodeContext, ConversationNodeDefinition, TurnLocation,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-llm-free-mode/types'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
@@ -10,6 +11,7 @@ import type {
   AssistantChatData, FinalAssistantChatData, TurnTailChatData,
 } from '../contract/chat-nodes.ts'
 import { deriveTurnMetrics } from '../contract/turn-metrics.ts'
+import { isRouteChange } from './failover.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
 import { toAssistantBlocks } from './event-projection.ts'
 
@@ -66,7 +68,7 @@ function turnCoordinates(event: Parameters<ConversationNodeDefinition['match']>[
     || event.type === 'step/end') {
     return { turn: event.data.turn, step: event.data.step }
   }
-  if (event.type === 'llm/retry' || event.type === 'llm/retry-started') {
+  if (event.type === 'llm/retry' || event.type === 'llm/retry-started' || event.type === 'llm/failover') {
     return { turn: event.data.turn, step: event.data.step }
   }
   return undefined
@@ -98,7 +100,7 @@ function closingAnchor(context: ConversationNodeContext<TurnTailState>): number 
       }
       continue
     }
-    if (event.type === 'llm/retry') {
+    if (event.type === 'llm/retry' || isRouteChange(event)) {
       steps.set(coordinates.step, { streamedText: false, finalized: false })
       continue
     }
@@ -140,6 +142,7 @@ function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChat
       || (event.type === 'tool/result' && event.surfaceOp === 'append')
       || (event.type === 'turn/end' && event.data.reason.kind === 'error')
       || event.type === 'llm/retry'
+      || event.type === 'llm/failover'
       ? event.seq
       : undefined
     if (candidate !== undefined && (latestTranscriptSeq === undefined || candidate > latestTranscriptSeq)) {

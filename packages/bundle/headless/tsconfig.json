@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../llm/llm-free-mode"
+    },
+    {
       "path": "../../../vendor/cordis"
     },
     {

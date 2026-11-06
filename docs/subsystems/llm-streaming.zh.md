@@ -800,6 +800,14 @@ declare abstract class LlmAdapter {
    */
   providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;
   /**
+   * Describe how one provider route reaches its endpoint, for policies and
+   * diagnostics that must not read adapter configuration. Implementations must
+   * answer synchronously without I/O.
+   * @param _provider - a route passed to `registerAdapter()` for this instance.
+   * @returns route access facts, or `undefined` when the adapter declares none.
+   */
+  providerAccess(_provider: string): LlmProviderAccess | undefined;
+  /**
    * Resolve provider-side request-image pricing for one exact model route.
    * The default declares none, so consumers fall back to their own neutral
    * estimate. Implementations must answer synchronously without I/O; the
@@ -887,6 +895,43 @@ async prepare(request: DeepSeekLlmApiExtensionRequest): Promise<PreparedDeepSeek
 
 Source: [`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../../packages/llm/deepseek-llm-api-extensions/src/index.ts)
 
+<a id="ctxfreemode--llmfreemode"></a>
+
+### `ctx.freeMode` — `LlmFreeMode`
+
+Free-mode service; see the module documentation.
+
+```ts cordis-catalog
+/**
+ * Read the current section, with the list kept even when disabled.
+ * @returns the resolved settings.
+ */
+currentSettings(): FreeModeSettings
+
+/**
+ * Check every listed route without sending a model request.
+ * @returns the problems found, in list order.
+ */
+async checkRoutes(): Promise<RouteIssue[]>
+
+/**
+ * Tell whether a provider publishes a catalog with per-model prices.
+ * @param provider - registered provider route.
+ * @returns true for an OpenRouter endpoint.
+ */
+hasCatalog(provider: string): boolean
+
+/**
+ * Read the daily quota of one provider without a model request.
+ * @param provider - registered provider route.
+ * @param signal - optional cancellation.
+ * @returns the quota, or `unknown` when the provider has no quota read.
+ */
+async readQuota(provider: string, signal?: AbortSignal): Promise<FreeModeQuota>
+```
+
+Source: [`packages/llm/llm-free-mode/src/index.ts`](../../packages/llm/llm-free-mode/src/index.ts)
+
 <a id="ctxllm--llmruntime"></a>
 
 ### `ctx.llm` — `LlmRuntime`
@@ -903,6 +948,22 @@ The abstract `llm` service: an adapter registry plus a streaming model-call API,
  * @returns the disposer, carrying {@link AdapterRegistrationHandle.replace}.
  */
 registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle
+
+/**
+ * Register a route guard consulted before every adapter dispatch and by
+ * {@link prepareCall}, so no `llm/stream` listener order can bypass it.
+ * Disposed with the fiber.
+ * @param guard - the check that throws to refuse a route.
+ * @returns the disposer.
+ */
+registerRouteGuard(guard: LlmRouteGuard): () => void
+
+/**
+ * Run every route guard without contacting a provider.
+ * @param route - provider route and model to check.
+ * @returns fulfillment when the route is admitted; a refusal rejects.
+ */
+async checkRoute(route: { readonly provider: string; readonly model: string }): Promise<void>
 
 /**
  * Describe provider routes with a registered adapter.
@@ -966,6 +1027,13 @@ async discoverModels( settingsNs: string, request: LlmModelDiscoveryRequest, sig
  * @returns the provider-owned policy, with normal defaults already resolved.
  */
 providerRetryPolicy(provider: string): ResolvedRetryPolicy
+
+/**
+ * Read the access facts of one registered provider route.
+ * @param provider - registered provider route to inspect.
+ * @returns the adapter's facts, or `undefined` when it declares none.
+ */
+providerAccess(provider: string): LlmProviderAccess | undefined
 
 /**
  * Resolve provider-side request-image pricing for one exact route, or

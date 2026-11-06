@@ -5,6 +5,7 @@ import type {
   PartialAssistant, RequestView,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-llm-free-mode/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { trajectoryNode } from './trajectory-definition-common.ts'
 import {
@@ -25,7 +26,8 @@ interface UsageValue {
 interface RetryValue {
   readonly message: string
   readonly code?: string
-  readonly retry: number
+  /** Attempt number; absent for a free-mode route change. */
+  readonly retry?: number
   readonly maxRetries?: number
   readonly delayMs: number
 }
@@ -301,7 +303,7 @@ function assistantRequest(
       : {
         error: state.retry.message,
         ...(state.retry.code === undefined ? {} : { errorCode: state.retry.code }),
-        retry: state.retry.retry,
+        ...(state.retry.retry === undefined ? {} : { retry: state.retry.retry }),
         ...(state.retry.maxRetries === undefined ? {} : { maxRetries: state.retry.maxRetries }),
         retryDelayMs: state.retry.delayMs,
       }),
@@ -312,6 +314,15 @@ function assistantRequest(
         ...(node.provenance === undefined ? {} : { provenance: node.provenance }),
       }),
     ...(state.usage === undefined ? {} : { usage: state.usage }),
+  }
+}
+
+function restartAttempt(state: AssistantState, retry: RetryValue): AssistantState {
+  return {
+    ...initialState(state.turn, state.step, state.startSeq, state.startTime, true),
+    firstTokenTime: state.firstTokenTime,
+    usage: state.usage,
+    retry,
   }
 }
 
@@ -326,6 +337,7 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
     if (event.type === 'assistant/live-chunk'
       || event.type === 'assistant/message'
       || event.type === 'llm/retry'
+      || event.type === 'llm/failover'
       || event.type === 'step/end') {
       return { id: `${event.data.turn}:${event.data.step}`, role: 'update' }
     }
@@ -349,27 +361,25 @@ const trajectoryAssistantDefinition: ConversationNodeDefinition<AssistantState> 
     }
     if (match.event.type === 'assistant/message') return settleMessage(context.state, match, match.event)
     if (match.event.type === 'step/end') return { ...context.state, stepEnd: match }
+    if (match.event.type === 'llm/failover') {
+      const { from, to, failureCode, delayMs } = match.event.data
+      if (to === undefined) return context.state
+      return restartAttempt(context.state, {
+        message: `${from.provider}/${from.model} → ${to.provider}/${to.model}`,
+        code: failureCode,
+        delayMs,
+      })
+    }
     if (match.event.type !== 'llm/retry') return context.state
     const data = match.event.data
     const failure = displayFailure(data.failure)
-    return {
-      ...initialState(
-        context.state.turn,
-        context.state.step,
-        context.state.startSeq,
-        context.state.startTime,
-        true,
-      ),
-      firstTokenTime: context.state.firstTokenTime,
-      usage: context.state.usage,
-      retry: {
-        message: failure.message,
-        ...(failure.code === undefined ? {} : { code: failure.code }),
-        retry: data.retry,
-        ...(data.mode === 'normal' ? { maxRetries: data.maxRetries } : {}),
-        delayMs: data.delayMs,
-      },
-    }
+    return restartAttempt(context.state, {
+      message: failure.message,
+      ...(failure.code === undefined ? {} : { code: failure.code }),
+      retry: data.retry,
+      ...(data.mode === 'normal' ? { maxRetries: data.maxRetries } : {}),
+      delayMs: data.delayMs,
+    })
   },
   publication: (match) => {
     if (match.event.type === 'step/start') return 'none'

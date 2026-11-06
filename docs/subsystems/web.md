@@ -163,6 +163,15 @@ Selection semantics (resolved at execution time, never order-dependent):
 
 ```ts cordis-catalog
 /**
+ * Register a check run on the selected provider before each search, in the
+ * search operation itself. A refusal throws {@link WebError}. Disposed with
+ * the calling fiber.
+ * @param guard - the check that throws to refuse a provider.
+ * @returns the disposer.
+ */
+registerSearchGuard(guard: (provider: WebSearchProvider) => void): () => void
+
+/**
  * Register a search provider. Throws {@link WebError} `WEB_DUPLICATE_PROVIDER`
  * if its id is already registered for search. Returns a disposer; disposed
  * with the calling fiber.

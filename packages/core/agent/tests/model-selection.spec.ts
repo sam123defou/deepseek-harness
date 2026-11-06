@@ -72,6 +72,32 @@ async function preStep(
 }
 
 describe('installModelSelection()', () => {
+  it('applies a reroute to the running step and announces it once on the next step', async () => {
+    const alpha = { provider: 'alpha', model: 'a1' }
+    const beta = { provider: 'beta', model: 'b1' }
+    const gamma = { provider: 'beta', model: 'b2' }
+    const { agent, ctx, dispose, selection } = await switchHarness(alpha, alpha)
+    const seed: LlmCallConfig = { provider: 'seed', model: 'seed' }
+
+    await expect(agentEvents(ctx, agent).serial('agent/model-reroute', { route: beta })).resolves.toBe(true)
+    await expect(agentEvents(ctx, agent).serial('agent/model-reroute', { route: gamma })).resolves.toBe(true)
+    expect(selection.current).toEqual(gamma)
+    expect(selection.assembled).toEqual(gamma)
+    await expect(agentEvents(ctx, agent).waterfall(
+      'agent/request', { turn: 1, step: 1, signal: SIGNAL }, () => Promise.resolve(seed),
+    )).resolves.toEqual(gamma)
+
+    agent.session.append('request/header', { header: { config: gamma }, reason: 'change' })
+    await ctx.systemPrompt.assemble()
+    await expect(preStep(ctx, agent, { step: 2 })).resolves.toMatchObject({
+      messages: [INPUT, expectedNotice('alpha/a1', 'beta/b2')],
+    })
+    await expect(preStep(ctx, agent, { step: 3 })).resolves.toEqual({ kind: 'enter', messages: [INPUT] })
+
+    dispose()
+    await expect(agentEvents(ctx, agent).serial('agent/model-reroute', { route: alpha })).resolves.toBeUndefined()
+  })
+
   it('snapshots prompt variables and request routing together, then disposes its listeners', async () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)

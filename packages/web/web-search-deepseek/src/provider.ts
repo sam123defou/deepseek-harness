@@ -179,6 +179,7 @@ export function mapAnthropicResponse(response: AnthropicResponse): WebSearchResu
  */
 export class DeepSeekSearchProvider implements WebSearchProvider {
   readonly id = DEEPSEEK_PROVIDER_ID
+  readonly billing = 'billed'
 
   /**
    * @param resolveOptions - the options for the NEXT operation, snapshotted

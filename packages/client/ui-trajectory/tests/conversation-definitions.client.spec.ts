@@ -172,6 +172,41 @@ function systemMessage(text: string) {
 }
 
 describe('Trajectory conversation Definitions', () => {
+  it('restarts the request on a free-mode route change and ignores a failover stop', () => {
+    const failover = {
+      turn: 1,
+      step: 1,
+      from: { provider: 'openrouter', model: 'first:free' },
+      cause: 'saturated',
+      failureCode: 'SERVER',
+      delayMs: 40,
+    } as const
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/live-chunk', {
+        turn: 1,
+        step: 1,
+        chunk: { type: 'text-delta', index: 0, text: 'abandoned attempt' },
+      }),
+    ])
+    value.append(at(4, 'llm/failover', failover))
+    value.flush()
+    expect(snapshot(value).partial?.blocks).toEqual([{ kind: 'text', text: 'abandoned attempt' }])
+
+    value.append(at(5, 'llm/failover', { ...failover, to: { provider: 'groq', model: 'next' } }))
+    value.flush()
+    expect(snapshot(value).partial).toBeNull()
+    expect(snapshot(value).requests).toMatchObject([{
+      purpose: 'assistant',
+      status: 'error',
+      error: 'openrouter/first:free → groq/next',
+      errorCode: 'SERVER',
+      retryDelayMs: 40,
+    }])
+    expect(snapshot(value).requests[0]).not.toHaveProperty('retry')
+  })
+
   it('assembles streaming usage, preserves retry facts, and materializes interruption', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

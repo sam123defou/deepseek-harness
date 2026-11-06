@@ -8,6 +8,8 @@ import { basename, delimiter, dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import ts from 'typescript'
+import { describeFailover } from '@deepseek-ai/dsh-llm-free-mode'
+import type { LlmFailoverEventData } from '@deepseek-ai/dsh-llm-free-mode/types'
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { releasedV0SessionFormatCodec } from '@deepseek-ai/dsh-session-format-v0-to-v1'
 import type { SessionFormatEvent, SessionFormatMigrationContext } from '@deepseek-ai/dsh-session-format'
@@ -422,6 +424,9 @@ function stderrFromSession(log: string): string {
     consume(record.type, data)
   }
   close()
+  for (const record of records(log)) {
+    if (record.type === 'llm/failover') output += `dsh: ${describeFailover(record.data as unknown as LlmFailoverEventData)}\n`
+  }
   const reason = turnReasonFromSession(log)
   if (reason?.kind !== 'error') return output
   const error = reason.error as JsonObject | undefined

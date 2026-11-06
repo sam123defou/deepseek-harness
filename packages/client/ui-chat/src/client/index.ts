@@ -24,7 +24,7 @@ export type {
 } from './contract/snapshot.ts'
 export type {
   AssistantChatData, ChatConversationViewNode, ChatNode, ChatNodeKind,
-  FinalAssistantChatData, ManualCompactionChatData, RetryChatData, ToolChatData,
+  FailoverChatData, FinalAssistantChatData, ManualCompactionChatData, RetryChatData, ToolChatData,
   TurnProcessChatData, TurnTailChatData,
 } from './contract/chat-nodes.ts'
 export type { ChatStoreState, ToolCallId, TurnProcessViewEntry } from './contract/store.ts'

@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../../vendor/loader"
+    },
+    {
       "path": "../../../vendor/cosmokit"
     },
     {

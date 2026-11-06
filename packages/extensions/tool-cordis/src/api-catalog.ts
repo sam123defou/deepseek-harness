@@ -950,6 +950,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'freeMode',
+    summary: 'Free-mode service; see the module documentation.',
+    description: 'Free-mode service; see the module documentation.',
+    methods: [
+      {
+        signature: 'currentSettings(): FreeModeSettings',
+        description: 'Read the current section, with the list kept even when disabled.',
+        parameters: [],
+        returns: 'the resolved settings.',
+      },
+      {
+        signature: 'async checkRoutes(): Promise<RouteIssue[]>',
+        description: 'Check every listed route without sending a model request.',
+        parameters: [],
+        returns: 'the problems found, in list order.',
+      },
+      {
+        signature: 'hasCatalog(provider: string): boolean',
+        description: 'Tell whether a provider publishes a catalog with per-model prices.',
+        parameters: [{ name: 'provider', description: 'registered provider route.' }],
+        returns: 'true for an OpenRouter endpoint.',
+      },
+      {
+        signature: 'async readQuota(provider: string, signal?: AbortSignal): Promise<FreeModeQuota>',
+        description: 'Read the daily quota of one provider without a model request.',
+        parameters: [{ name: 'provider', description: 'registered provider route.' }, { name: 'signal', description: 'optional cancellation.' }],
+        returns: 'the quota, or `unknown` when the provider has no quota read.',
+      },
+    ],
+  },
+  {
     key: 'fs',
     summary: 'Abstract filesystem provider.',
     description: 'Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and mutations are atomic. Optional guards add stale protection without changing the unguarded provider contract.',
@@ -1211,6 +1242,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the disposer, carrying {@link AdapterRegistrationHandle.replace}.',
       },
       {
+        signature: 'registerRouteGuard(guard: LlmRouteGuard): () => void',
+        description: 'Register a route guard consulted before every adapter dispatch and by prepareCall, so no `llm/stream` listener order can bypass it. Disposed with the fiber.',
+        parameters: [{ name: 'guard', description: 'the check that throws to refuse a route.' }],
+        returns: 'the disposer.',
+      },
+      {
+        signature: 'async checkRoute(route: { readonly provider: string; readonly model: string }): Promise<void>',
+        description: 'Run every route guard without contacting a provider.',
+        parameters: [{ name: 'route', description: 'provider route and model to check.' }],
+        returns: 'fulfillment when the route is admitted; a refusal rejects.',
+      },
+      {
         signature: '@Remote listProviders(): LlmProviderInfo[]',
         description: 'Describe provider routes with a registered adapter.',
         parameters: [],
@@ -1252,6 +1295,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Resolve the retry policy captured when one provider route was registered.',
         parameters: [{ name: 'provider', description: 'registered provider route to inspect.' }],
         returns: 'the provider-owned policy, with normal defaults already resolved.',
+      },
+      {
+        signature: 'providerAccess(provider: string): LlmProviderAccess | undefined',
+        description: 'Read the access facts of one registered provider route.',
+        parameters: [{ name: 'provider', description: 'registered provider route to inspect.' }],
+        returns: 'the adapter\'s facts, or `undefined` when it declares none.',
       },
       {
         signature: 'imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined',
@@ -2761,6 +2810,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'The web access service. Registered as `ctx.web` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A configured id that is registered and `available()` → that provider.\n- A configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.\n- A configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- No id configured, exactly one registered usable provider → that provider.\n- No id configured, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.\n- No id configured, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.',
     methods: [
       {
+        signature: 'registerSearchGuard(guard: (provider: WebSearchProvider) => void): () => void',
+        description: 'Register a check run on the selected provider before each search, in the search operation itself. A refusal throws WebError. Disposed with the calling fiber.',
+        parameters: [{ name: 'guard', description: 'the check that throws to refuse a provider.' }],
+        returns: 'the disposer.',
+      },
+      {
         signature: 'registerSearchProvider(provider: WebSearchProvider): () => void',
         description: 'Register a search provider. Throws WebError `WEB_DUPLICATE_PROVIDER` if its id is already registered for search. Returns a disposer; disposed with the calling fiber.',
         parameters: [{ name: 'provider', description: 'the provider; its `id` is the registry key.' }],
@@ -3089,6 +3144,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'One message entered the live inbox.',
     description: 'One message entered the live inbox.',
     parameters: [{ name: 'payload', description: '.message - the inserted message. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
+  },
+  {
+    name: 'agent/model-reroute',
+    mode: 'serial',
+    signature: '\'agent/model-reroute\'(this: Scoped<Agent>, payload: { agent: Agent; route: ModelSelection }): true | undefined',
+    summary: 'Replace the route selected for the current step and the following steps.',
+    description: 'Replace the route selected for the current step and the following steps. A listener that owns the Agent\'s model selection returns `true` after both apply; an Agent without an installed selection leaves the result undefined.',
+    parameters: [{ name: 'payload', description: '.route - the provider and model to use from the next request attempt.' }],
   },
   {
     name: 'agent/pre-step',
@@ -4243,6 +4306,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface FinishReasonMap {\n    \'stop\': {\n        kind: \'stop\';\n    };\n    \'tool-calls\': {\n        kind: \'tool-calls\';\n    };\n    \'max-tokens\': {\n        kind: \'max-tokens\';\n    };\n    \'aborted\': {\n        kind: \'aborted\';\n        failure: LlmFailure;\n    };\n    \'error\': {\n        kind: \'error\';\n        failure: LlmFailure;\n    };\n}',
   },
   {
+    name: 'FreeModeQuota',
+    declaration: 'export type FreeModeQuota = {\n    readonly provider: string;\n    readonly state: \'known\';\n    readonly used: number;\n    readonly limit: number;\n    readonly remaining: number;\n} | {\n    readonly provider: string;\n    readonly state: \'unknown\';\n};',
+  },
+  {
+    name: 'FreeModeSettings',
+    declaration: 'export interface FreeModeSettings {\n    enabled: boolean;\n    routes: FreeRoute[];\n    rateLimitDelayMs: number;\n    maxFailoverMs: number;\n    maxRouteIdleMs: number;\n    networkTimeoutMs: number;\n}',
+  },
+  {
+    name: 'FreeRoute',
+    declaration: 'export interface FreeRoute extends FreeRouteKey {\n    freeTierConfirmed?: boolean;\n}',
+  },
+  {
+    name: 'FreeRouteKey',
+    declaration: 'export interface FreeRouteKey {\n    provider: string;\n    model: string;\n}',
+  },
+  {
     name: 'FsDirEntry',
     declaration: 'export interface FsDirEntry {\n    name: string;\n    type: \'file\' | \'directory\' | \'other\';\n    target: FsTarget;\n    version?: FsVersion;\n    size?: number;\n}',
   },
@@ -4496,7 +4575,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmAdapter',
-    declaration: 'export abstract class LlmAdapter {\n    providerInfo(provider: string): LlmProviderInfo;\n    providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;\n    imageRequestPricing(_provider: string, _model: string): LlmImageRequestPricing | undefined;\n    listModels(_provider: string): Promise<readonly LlmModelInfo[]>;\n    resolveModel(provider: string, model: string, _signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall>;\n    abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+    declaration: 'export abstract class LlmAdapter {\n    providerInfo(provider: string): LlmProviderInfo;\n    providerRetryPolicy(_provider: string): ResolvedRetryPolicy | undefined;\n    providerAccess(_provider: string): LlmProviderAccess | undefined;\n    imageRequestPricing(_provider: string, _model: string): LlmImageRequestPricing | undefined;\n    listModels(_provider: string): Promise<readonly LlmModelInfo[]>;\n    resolveModel(provider: string, model: string, _signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall>;\n    abstract stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
   },
   {
     name: 'LlmAttemptId',
@@ -4547,6 +4626,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface LlmModelReasoningInfo {\n    efforts: readonly LlmReasoningEffortInfo[];\n    defaultEffort?: ReasoningEffortId;\n}',
   },
   {
+    name: 'LlmProviderAccess',
+    declaration: 'export interface LlmProviderAccess {\n    readonly streamIdleTimeoutMs?: number;\n    readonly credentialRef?: string;\n    readonly baseURL?: string;\n}',
+  },
+  {
     name: 'LlmProviderInfo',
     declaration: 'export interface LlmProviderInfo {\n    id: string;\n    name: string;\n}',
   },
@@ -4559,8 +4642,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface LlmResolvedModelInfo extends LlmModelInfo {\n    context?: LlmModelContext;\n    defaultMaxTokens?: number;\n    reasoning?: LlmModelReasoningInfo;\n    systemPromptUpdate?: SystemPromptUpdate;\n}',
   },
   {
+    name: 'LlmRouteGuard',
+    declaration: 'export type LlmRouteGuard = (route: {\n    readonly provider: string;\n    readonly model: string;\n}) => void | Promise<void>;',
+  },
+  {
     name: 'LlmRuntime',
-    declaration: 'export class LlmRuntime extends TypertRemoteService {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    @Remote\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    @Remote\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    @Remote(\'discoverModels\')\n    async remoteDiscoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined;\n    fileRequestText(ref: FileAttachmentRef): string;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions) /* …truncated — full shape in source */',
+    declaration: 'export class LlmRuntime extends TypertRemoteService {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    registerRouteGuard(guard: LlmRouteGuard): () => void;\n    async checkRoute(route: {\n        readonly provider: string;\n        readonly model: string;\n    }): Promise<void>;\n    @Remote\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    @Remote\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    @Remote(\'discoverModels\')\n    async remoteDiscoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    providerAccess(provider: string): LlmProviderAccess | undefined;\n    imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined;\n    fileRequestText(ref: FileAttachmentRef): string;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmR /* …truncated — full shape in source */',
   },
   {
     name: 'LspHover',
@@ -4949,6 +5036,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResumeAgentOptions',
     declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly parentAgent?: Agent;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
+  },
+  {
+    name: 'RouteIssue',
+    declaration: 'export interface RouteIssue {\n    readonly route: FreeRouteKey;\n    readonly problem: RouteProblem;\n    readonly code: string;\n    readonly message: string;\n}',
+  },
+  {
+    name: 'RouteProblem',
+    declaration: 'export type RouteProblem = \'provider-unknown\' | \'model-not-configured\' | \'credential-missing\' | \'unbounded-retry\' | \'timeout-too-long\';',
   },
   {
     name: 'RunnerFailureRule',
@@ -6332,7 +6427,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WebSearchProvider',
-    declaration: 'export interface WebSearchProvider {\n    readonly id: string;\n    available(): boolean;\n    search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult>;\n}',
+    declaration: 'export interface WebSearchProvider {\n    readonly id: string;\n    readonly billing: \'free\' | \'billed\';\n    available(): boolean;\n    search(request: WebSearchRequest, signal?: AbortSignal): Promise<WebSearchResult>;\n}',
   },
   {
     name: 'WebSearchRequest',

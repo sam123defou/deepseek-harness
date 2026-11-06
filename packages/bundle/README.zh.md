@@ -26,6 +26,7 @@ kind: "package-group"
 | [`acp-app`](acp-app/README.zh.md) | 基于 base 的纯自动化 ACP stdio 应用 | 挂载 ACP bridge |
 | [`web-app`](web-app/README.zh.md) | 基于 base 的浏览器应用层 | 挂载 Web 配置项 |
 | [`headless`](headless/README.zh.md) | 基于 base 的一次性命令行任务应用 | `headless-runner` |
+| [`free-check`](free-check/README.zh.md) | 基于 base 的免费模式诊断 | `free-check` |
 | [`sdk-app`](sdk-app/README.zh.md) | 基于 base 的 SDK JSON-RPC stdio 应用 | 挂载 SDK server |
 | [`sdk-minimal`](sdk-minimal/README.zh.md) | 不使用 base 或 Web 的独立极简 SDK 应用 | —（完整 patch 树） |
 

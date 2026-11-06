@@ -134,6 +134,7 @@ export class SessionCommandController {
     const agent = await this.resolveAgent(request.sessionId)
     return this.agents.serializeImageAdmission(agent, async () => {
       try {
+        await this.ctx.llm.checkRoute(request)
         const resolved = await this.ctx.llm.resolveCallConfig({
           provider: request.provider,
           model: request.model,

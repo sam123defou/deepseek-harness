@@ -461,6 +461,7 @@ describe('provider profile lifecycle', () => {
       { id: 'openai', name: 'openai' },
       { id: 'anthropic', name: 'anthropic' },
     ])
+    expect(typeof ctx.llm.providerAccess('openai')?.streamIdleTimeoutMs).toBe('number')
     expect(ctx.llm.providerRetryPolicy('openai')).toEqual({
       mode: 'always',
       initialDelayMs: 25,

@@ -74,6 +74,22 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
+/** How one provider route reaches its endpoint; every field is optional because adapters differ. */
+export interface LlmProviderAccess {
+  /** Maximum provider idle time while one stream read is outstanding, in milliseconds. */
+  readonly streamIdleTimeoutMs?: number
+  /** Credential reference resolved for this route, never the credential value. */
+  readonly credentialRef?: string
+  /** Endpoint root of this route. */
+  readonly baseURL?: string
+}
+
+/**
+ * Decides whether one route may be used. A refusal throws; the check must not
+ * send a model request.
+ */
+export type LlmRouteGuard = (route: { readonly provider: string; readonly model: string }) => void | Promise<void>
+
 /** Structured provider facts and cause accepted by {@link LlmError}. */
 export interface LlmErrorOptions extends ErrorOptions {
   /** Valid HTTP status observed at the provider boundary. */
@@ -217,6 +233,17 @@ export abstract class LlmAdapter {
   }
 
   /**
+   * Describe how one provider route reaches its endpoint, for policies and
+   * diagnostics that must not read adapter configuration. Implementations must
+   * answer synchronously without I/O.
+   * @param _provider - a route passed to `registerAdapter()` for this instance.
+   * @returns route access facts, or `undefined` when the adapter declares none.
+   */
+  providerAccess(_provider: string): LlmProviderAccess | undefined {
+    return undefined
+  }
+
+  /**
    * Resolve provider-side request-image pricing for one exact model route.
    * The default declares none, so consumers fall back to their own neutral
    * estimate. Implementations must answer synchronously without I/O; the
@@ -332,6 +359,7 @@ export interface DirectoryRegistrationHandle {
  */
 export class LlmRuntime extends TypertRemoteService {
   private adapters = new Map<string, AdapterRegistration>()
+  private routeGuards = new Set<LlmRouteGuard>()
   private directory = new Map<string, LlmConfigurableProvider>()
   private discoveries = new Map<
     string,
@@ -413,6 +441,30 @@ export class LlmRuntime extends TypertRemoteService {
       this.commitRoutes(owned, this.prepareRoutes(next, adapter, owned))
     }
     return handle
+  }
+
+  /**
+   * Register a route guard consulted before every adapter dispatch and by
+   * {@link prepareCall}, so no `llm/stream` listener order can bypass it.
+   * Disposed with the fiber.
+   * @param guard - the check that throws to refuse a route.
+   * @returns the disposer.
+   */
+  registerRouteGuard(guard: LlmRouteGuard): () => void {
+    const dispose = this.ctx.effect(function* (this: LlmRuntime) {
+      this.routeGuards.add(guard)
+      yield () => { this.routeGuards.delete(guard) }
+    }.bind(this), 'llm.registerRouteGuard()')
+    return () => void dispose()
+  }
+
+  /**
+   * Run every route guard without contacting a provider.
+   * @param route - provider route and model to check.
+   * @returns fulfillment when the route is admitted; a refusal rejects.
+   */
+  async checkRoute(route: { readonly provider: string; readonly model: string }): Promise<void> {
+    for (const guard of this.routeGuards) await guard({ provider: route.provider, model: route.model })
   }
 
   /**
@@ -652,6 +704,15 @@ export class LlmRuntime extends TypertRemoteService {
    */
   providerRetryPolicy(provider: string): ResolvedRetryPolicy {
     return this.registration(provider).retryPolicy
+  }
+
+  /**
+   * Read the access facts of one registered provider route.
+   * @param provider - registered provider route to inspect.
+   * @returns the adapter's facts, or `undefined` when it declares none.
+   */
+  providerAccess(provider: string): LlmProviderAccess | undefined {
+    return this.registration(provider).adapter.providerAccess(provider)
   }
 
   /**
@@ -914,6 +975,7 @@ export class LlmRuntime extends TypertRemoteService {
    * @returns a prepared config and its registration-bound stream entry point.
    */
   async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall> {
+    await this.checkRoute(config)
     const registration = this.registration(config.provider)
     const adapterCall = await registration.adapter.prepareCall(config.provider, config.model, signal)
     const modelInfo = this.normalizeModelInfo(registration, config.model, adapterCall.model)
@@ -1014,6 +1076,7 @@ export class LlmRuntime extends TypertRemoteService {
   ): AsyncGenerator<StreamChunk> {
     let iterator: AsyncIterator<StreamChunk>
     try {
+      await this.checkRoute(options)
       const registration = prepared?.registration ?? this.registration(options.provider)
       const adapter = registration.adapter
       let modelInfo: LlmResolvedModelInfo

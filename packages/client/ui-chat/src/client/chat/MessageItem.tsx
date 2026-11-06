@@ -2,8 +2,10 @@ import { Fragment, memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { FailureCause, FreeRouteKey } from '@deepseek-ai/dsh-llm-free-mode/types'
 import { fileExtension, FileTypeIcon, fileSizeText, JsonBlock, projectUserText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
+import type { ChatKey } from '../locale.ts'
 import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract/snapshot.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
@@ -53,6 +55,34 @@ function failureMessage(
   t: ChatViewSlotProps['t'],
 ): string {
   return code === 'AUTH' ? t('message.failure.auth') : message
+}
+
+const FAILOVER_REASONS = {
+  'saturated': 'message.failover.reason.saturated',
+  'rate-limited': 'message.failover.reason.rateLimited',
+  'unavailable': 'message.failover.reason.unavailable',
+  'invalid-request': 'message.failover.reason.invalidRequest',
+  'quota-exhausted': 'message.failover.reason.quotaExhausted',
+  'credential-missing': 'message.failover.reason.credentialMissing',
+  'auth-refused': 'message.failover.reason.authRefused',
+  'context-exceeded': 'message.failover.reason.contextExceeded',
+  'unknown': 'message.failover.reason.unknown',
+} as const satisfies Record<FailureCause, ChatKey>
+
+const FAILOVER_ACTIONS = {
+  'saturated': 'message.failover.action.saturated',
+  'rate-limited': 'message.failover.action.rateLimited',
+  'unavailable': 'message.failover.action.unavailable',
+  'invalid-request': 'message.failover.action.invalidRequest',
+  'quota-exhausted': 'message.failover.action.quotaExhausted',
+  'credential-missing': 'message.failover.action.credentialMissing',
+  'auth-refused': 'message.failover.action.authRefused',
+  'context-exceeded': 'message.failover.action.contextExceeded',
+  'unknown': 'message.failover.action.unknown',
+} as const satisfies Record<FailureCause, ChatKey>
+
+function routeName(route: FreeRouteKey): string {
+  return `${route.provider}/${route.model}`
 }
 
 function ModelRetryItem({ node, active, t }: {
@@ -358,6 +388,24 @@ export const CompactionNodeView = memo(function CompactionNodeView({ node, t }: 
 export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeViewProps<'model-retry'>) {
   const data = node.data
   return <ModelRetryItem node={data.current} active={data.current.retryState === 'scheduled'} t={t} />
+})
+
+/** Free-mode failover keyed Chat renderer. */
+export const FailoverNodeView = memo(function FailoverNodeView({ node, t }: ChatNodeViewProps<'model-failover'>) {
+  const { cause, from, to } = node.data
+  return (
+    <div className={css.retryRow}>
+      <span className={css.retryText} role="status">
+        {to === undefined
+          ? t('message.failover.stopped', { from: routeName(from), action: t(FAILOVER_ACTIONS[cause]) })
+          : t('message.failover.switched', {
+            from: routeName(from),
+            to: routeName(to),
+            reason: t(FAILOVER_REASONS[cause]),
+          })}
+      </span>
+    </div>
+  )
 })
 
 /** Terminal turn-error keyed Chat renderer. */

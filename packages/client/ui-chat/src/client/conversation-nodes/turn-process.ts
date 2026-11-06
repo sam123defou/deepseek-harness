@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConversationLocation, ConversationNodeContext, ConversationNodeDefinition, TurnLocation,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-llm-free-mode/types'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-tools/types'
@@ -84,7 +85,8 @@ function processEvidence(event: ConversationEvent): ProcessEvidence | undefined 
   }
   if (event.type === 'tool/call'
     || (event.type === 'tool/result' && event.surfaceOp === 'append')
-    || event.type === 'llm/retry') return { kind: 'other', seq: event.seq }
+    || event.type === 'llm/retry'
+    || event.type === 'llm/failover') return { kind: 'other', seq: event.seq }
   return undefined
 }
 
@@ -218,6 +220,7 @@ export const turnProcessDefinition: ConversationNodeDefinition<TurnProcessState>
       || event.type === 'tool/call'
       || event.type === 'tool/result'
       || event.type === 'llm/retry'
+      || event.type === 'llm/failover'
       || event.type === 'step/start'
       || event.type === 'step/end'
       || event.type === 'turn/end') {

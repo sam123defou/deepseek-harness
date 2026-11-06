@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  cancellableDelay,
   clampTimeout,
   deadline,
   idleWatchdog,
@@ -287,5 +288,19 @@ describe('idleWatchdog', () => {
     void watchdog.next(iterator)
     await expect(watchdog.next(iterator)).rejects.toThrow(/already outstanding/)
     pending.resolve({ done: true, value: undefined })
+  })
+})
+
+describe('cancellableDelay()', () => {
+  it('completes unless the signal is already aborted', async () => {
+    await expect(cancellableDelay(1, new AbortController().signal)).resolves.toBe(true)
+    await expect(cancellableDelay(1, AbortSignal.abort())).resolves.toBe(false)
+  })
+
+  it('stops a running wait', async () => {
+    const controller = new AbortController()
+    const wait = cancellableDelay(60_000, controller.signal)
+    controller.abort()
+    await expect(wait).resolves.toBe(false)
   })
 })

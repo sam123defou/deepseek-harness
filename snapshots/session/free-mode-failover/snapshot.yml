@@ -1,0 +1,12 @@
+version: 1
+scenario: free-mode-failover
+profile: headless
+composition: retry
+recording: authored
+header:
+  class: free-mode
+  pin: true
+  changes: 1
+  systemPromptSource: text-turn
+replay:
+  override: true

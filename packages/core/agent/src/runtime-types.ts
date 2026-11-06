@@ -12,6 +12,7 @@ import type {
 } from '@deepseek-ai/dsh-llm'
 import type { AgentCancelCause, Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
 export type { AgentCancelCause } from '@deepseek-ai/dsh-session'
+import type { ModelSelection } from './model-selection.ts'
 import type { Agent, InboxTarget } from './types.ts'
 export type { Agent } from './types.ts'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -361,6 +362,17 @@ declare module '@deepseek-ai/cordis' {
      * @mode waterfall
      */
     'agent/request-error'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; provider: string; failure: LlmFailure; retryPolicy: ResolvedRetryPolicy | undefined; signal: AbortSignal }, next: () => Promise<RequestErrorAction>): Promise<RequestErrorAction>
+    /**
+     * Replace the route selected for the current step and the following steps.
+     * A listener that owns the Agent's model selection returns `true` after both
+     * apply; an Agent without an installed selection leaves the result undefined.
+     * @param payload.agent - the agent whose selection changes.
+     * @param payload.route - the provider and model to use from the next request attempt.
+     * @returns `true` when the route was applied.
+     * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+     * @mode serial
+     */
+    'agent/model-reroute'(this: Scoped<Agent>, payload: { agent: Agent; route: ModelSelection }): true | undefined
     /**
      * Process-local assistant-stream publication. Chunk frames are transient;
      * the loop appends one final v2 `assistant/message` or `assistant/attempt`

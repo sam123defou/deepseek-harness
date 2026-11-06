@@ -188,3 +188,24 @@ export function timeoutOf(x: AbortSignal | { reason?: unknown }, code?: string):
   if (!(reason instanceof TimeoutReason)) return undefined
   return code === undefined || reason.code === code ? reason : undefined
 }
+
+/**
+ * Wait unless the signal aborts first.
+ * @param delayMs - wait in milliseconds.
+ * @param signal - cancellation of the wait.
+ * @returns true when the wait completed, false when it was cancelled.
+ */
+export function cancellableDelay(delayMs: number, signal: AbortSignal): Promise<boolean> {
+  if (signal.aborted) return Promise.resolve(false)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve(true)
+    }, delayMs)
+    function onAbort(): void {
+      clearTimeout(timer)
+      resolve(false)
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}

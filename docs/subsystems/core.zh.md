@@ -1070,6 +1070,30 @@ Types: [Scoped](scope.zh.md) · [UserMessage](session.zh.md)
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
+<a id="agentmodel-reroute--serial"></a>
+
+#### `agent/model-reroute` — serial
+
+Replace the route selected for the current step and the following steps. A listener that owns the Agent's model selection returns `true` after both apply; an Agent without an installed selection leaves the result undefined.
+
+```ts cordis-catalog
+/**
+ * Replace the route selected for the current step and the following steps.
+ * A listener that owns the Agent's model selection returns `true` after both
+ * apply; an Agent without an installed selection leaves the result undefined.
+ * @param payload.agent - the agent whose selection changes.
+ * @param payload.route - the provider and model to use from the next request attempt.
+ * @returns `true` when the route was applied.
+ * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+ * @mode serial
+ */
+'agent/model-reroute'(this: Scoped<Agent>, payload: { agent: Agent; route: ModelSelection }): true | undefined
+```
+
+Types: [Scoped](scope.zh.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
 <a id="agentpre-step--waterfall"></a>
 
 #### `agent/pre-step` — waterfall

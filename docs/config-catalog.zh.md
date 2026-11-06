@@ -215,7 +215,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/api/session-controller/src/index.ts:69`](../packages/api/session-controller/src/index.ts)
+来源：[`packages/api/session-controller/src/index.ts:71`](../packages/api/session-controller/src/index.ts)
 
 <a id="deepseek-aidsh-api-settings-controller"></a>
 
@@ -826,7 +826,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/bundle/headless/src/index.ts:34`](../packages/bundle/headless/src/index.ts)
+来源：[`packages/bundle/headless/src/index.ts:35`](../packages/bundle/headless/src/index.ts)
 
 <a id="deepseek-aidsh-hooks-claude-code"></a>
 
@@ -1097,6 +1097,22 @@ export interface DeepSeekCatalogModel {
 依赖：[`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · [`SystemPromptUpdate`](../packages/llm/llm/src/index.ts)
 
 来源：[`packages/llm/llm-deepseek/src/index.ts:125`](../packages/llm/llm-deepseek/src/index.ts)
+
+<a id="deepseek-aidsh-llm-free-mode"></a>
+
+## `@deepseek-ai/dsh-llm-free-mode`
+
+需要：`agents` · `llm` · `sessionProjections` · `settings`
+
+```ts config-catalog
+/** Composition entry of the plugin. */
+export interface Config {
+  /** `free-check` only: reports unusable routes instead of refusing requests for them. */
+  reportOnly?: boolean
+}
+```
+
+来源：[`packages/llm/llm-free-mode/src/index.ts:57`](../packages/llm/llm-free-mode/src/index.ts)
 
 <a id="deepseek-aidsh-llm-pi-ai"></a>
 
@@ -1463,7 +1479,7 @@ export interface ReplayModelConfig {
 export type Config = Readonly<Record<string, never>>
 ```
 
-来源：[`packages/llm/llm-retry/src/index.ts:25`](../packages/llm/llm-retry/src/index.ts)
+来源：[`packages/llm/llm-retry/src/index.ts:26`](../packages/llm/llm-retry/src/index.ts)
 
 <a id="deepseek-aidsh-lsp-stdio"></a>
 
@@ -2677,7 +2693,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/context/time-context/src/index.ts:48`](../packages/context/time-context/src/index.ts)
+来源：[`packages/context/time-context/src/index.ts:49`](../packages/context/time-context/src/index.ts)
 
 <a id="deepseek-aidsh-tmux-context"></a>
 
@@ -3238,7 +3254,7 @@ export interface Config {
 export type ApprovalPolicy = 'ask' | 'never'
 ```
 
-来源：[`packages/interaction/user-approval/src/index.ts:126`](../packages/interaction/user-approval/src/index.ts)
+来源：[`packages/interaction/user-approval/src/index.ts:127`](../packages/interaction/user-approval/src/index.ts)
 
 <a id="deepseek-aidsh-web"></a>
 
@@ -3501,6 +3517,7 @@ export interface Config {
 - `@deepseek-ai/dsh-cordis-client-runner`（[`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts)）
 - `@deepseek-ai/dsh-deepseek-llm-api-extensions`（[`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../packages/llm/deepseek-llm-api-extensions/src/index.ts)）
 - `@deepseek-ai/dsh-experimental-client-ui-agent-team`（[`packages/experimental/client-ui-agent-team/src/index.ts`](../packages/experimental/client-ui-agent-team/src/index.ts)）
+- `@deepseek-ai/dsh-free-check` — 需要 `cmdlineArgs` · `freeMode` · `llm`（[`packages/bundle/free-check/src/index.ts`](../packages/bundle/free-check/src/index.ts)）
 - `@deepseek-ai/dsh-fs-e2b` — 需要 `e2b`（[`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts)）
 - `@deepseek-ai/dsh-fs-observation-policy`（[`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts)）
 - `@deepseek-ai/dsh-goal-round-driver` — 需要 `agents` · `goals` · `sessions`（[`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts)）

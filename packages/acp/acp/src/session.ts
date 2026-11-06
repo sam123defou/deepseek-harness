@@ -1,6 +1,7 @@
 /** One standard ACP session's Agent, configuration, prompt, update, and teardown lifecycle. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/cordis-plugin-loader'
 import {
   RequestError,
   type McpServer,
@@ -90,6 +91,11 @@ function selectionFor(
     }
 }
 
+/** A client can reach the bridge while Loader siblings still mount; an Agent must not run before their route guards exist. */
+async function settledLoader(ctx: Context): Promise<void> {
+  await ctx.get('loader')?.await()
+}
+
 /**
  * Per-session ACP module. It owns the unpublished Agent composition, selected
  * route, one-prompt admission slot, ordered standard updates, and memoized
@@ -124,6 +130,7 @@ export class AcpSession {
    * @returns the fully composed per-session module.
    */
   static async create(ctx: Context, options: CreateAcpSessionOptions): Promise<AcpSession> {
+    await settledLoader(ctx)
     const modelControl = new AcpModelControl(ctx.llm, options.fallbackSelection)
     const handle = await ctx.agents.create({
       sessionId: options.sessionId,
@@ -145,6 +152,7 @@ export class AcpSession {
    * @returns the restored per-session module.
    */
   static async resume(ctx: Context, options: ResumeAcpSessionOptions): Promise<AcpSession> {
+    await settledLoader(ctx)
     let modelControl: AcpModelControl | undefined
     const handle = await ctx.agents.resume({
       resumeSessionId: options.sessionId,

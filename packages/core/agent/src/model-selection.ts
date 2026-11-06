@@ -69,11 +69,16 @@ function modelSwitchNotice(previous: ModelSelection, selected: ModelSelection) {
  * notice. Failure before header persistence repeats the notice on the next
  * request.
  *
+ * `agent/model-reroute` replaces the selection inside a running step. Retries
+ * do not repeat `agent/pre-step`, so the following step carries one notice
+ * naming the route selected before the first unannounced reroute.
+ *
  * @param agentCtx - The selected Agent's scoped context.
  * @param selection - Mutable selection owned by the calling entry point.
  * @returns Disposer for all scoped waterfall listeners.
  */
 export function installModelSelection(agentCtx: Context, selection: ModelSelectionRef): () => void {
+  let reroutedFrom: ModelSelection | undefined
   const disposeAssembly = agentCtx.on('system-prompt/assemble', async (_assembly, _context, next) => {
     const selected = selection.current
     const assembled = await next()
@@ -113,15 +118,23 @@ export function installModelSelection(agentCtx: Context, selection: ModelSelecti
       // The loop skips an empty first step and an emptied offered continuation.
       if (decision.messages.length === 0 && (step === 1 || messages.length > 0)) return decision
       const selected = selection.assembled
-      const previous = agent.session.requestHeader()?.config
+      const previous = reroutedFrom ?? agent.session.requestHeader()?.config
+      reroutedFrom = undefined
       if (selected === undefined || previous === undefined || sameRoute(selected, previous)) return decision
       return { ...decision, messages: [...decision.messages, modelSwitchNotice(previous, selected)] }
     },
     { prepend: true },
   )
+  const disposeReroute = agentCtx.on('agent/model-reroute', ({ route }) => {
+    reroutedFrom ??= selection.assembled
+    selection.current = route
+    selection.assembled = route
+    return true
+  })
   return () => {
     disposeAssembly()
     disposeRequest()
     disposeNotice()
+    disposeReroute()
   }
 }

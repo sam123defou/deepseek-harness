@@ -5,6 +5,7 @@ import { AcpModelControl } from '../src/model-control.ts'
 /** Minimal LLM catalog/runtime double for pure standard-option tests. */
 function llmRuntime(overrides: Partial<LlmRuntime> = {}): LlmRuntime {
   return {
+    checkRoute: () => Promise.resolve(),
     listProviders: () => [{ id: 'mock', name: 'Mock' }],
     listModels: () => Promise.resolve([{ provider: 'mock', id: 'mock', name: 'Mock' }]),
     resolveCallConfig: (selection: { provider?: string; model?: string; reasoningEffort?: string }) => Promise.resolve({
@@ -31,6 +32,26 @@ function llmRuntime(overrides: Partial<LlmRuntime> = {}): LlmRuntime {
 }
 
 describe('ACP model configuration control', () => {
+  it('keeps the selection when a route guard refuses the chosen model', async () => {
+    const initial = { provider: 'mock', model: 'mock' }
+    const control = new AcpModelControl(llmRuntime({
+      checkRoute: () => Promise.reject(new Error('free mode refused this route')),
+    }), initial)
+    const [model] = await control.options()
+    const group = (model as unknown as { options: { options: { value: string }[] }[] }).options[0]
+    await expect(control.set('model', group?.options[0]?.value)).rejects.toThrow('free mode refused this route')
+    expect(control.snapshot()).toMatchObject(initial)
+  })
+
+  it('moves a pinned turn to the rerouted model', () => {
+    const control = new AcpModelControl(llmRuntime(), { provider: 'mock', model: 'first' })
+    control.pinTurn(1, { provider: 'mock', model: 'first' })
+    control.selection.current = { provider: 'mock', model: 'second' }
+    expect(control.selection.current).toEqual({ provider: 'mock', model: 'second' })
+    control.releaseTurn(1)
+    expect(control.selection.current).toEqual({ provider: 'mock', model: 'second' })
+  })
+
   it('represents an absent route and validates value types before mutation', async () => {
     const control = new AcpModelControl(llmRuntime(), undefined)
 

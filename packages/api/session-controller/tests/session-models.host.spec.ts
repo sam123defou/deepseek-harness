@@ -10,7 +10,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import AttachmentStore from '@deepseek-ai/dsh-attachment'
-import LlmRuntime, { LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { LlmAdapter, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type {
   GenerateOptions, LlmCallConfig, LlmCallConfigAdapterDefaults, LlmModelInfo,
   LlmModelReasoningInfo, LlmProviderInfo, LlmResolvedModelInfo, StreamChunk,
@@ -488,6 +488,20 @@ describe('Web session model selection', () => {
         message: 'no adapter registered for provider "missing"',
         details: { provider: 'missing', model: 'model' },
       },
+    })
+
+    const disposeGuard = ctx.llm.registerRouteGuard(() => {
+      throw new LlmError('free mode refused this route', 'FREE_MODE_ROUTE_REFUSED')
+    })
+    const refusedByGuard = await remote.selectModel(request({
+      sessionId,
+      provider: 'deepseek-official',
+      model: 'private-preview',
+    }))
+    disposeGuard()
+    expect(refusedByGuard).toMatchObject({
+      ok: false,
+      error: { code: 'session/model-unavailable', message: 'free mode refused this route' },
     })
     expect(await remote.selectModel(request({
       sessionId,

@@ -49,6 +49,7 @@ import type {
   GenerateOptions,
   ImageAttachmentAccess,
   LlmModelInfo,
+  LlmProviderAccess,
   LlmProviderInfo,
   LlmResolvedModelInfo,
   PreparedAdapterCall,
@@ -271,6 +272,18 @@ export class PiAiAdapter extends LlmAdapter {
 
   override providerRetryPolicy(provider: string): ResolvedRetryPolicy | undefined {
     return this.current().profiles.get(provider)?.retryPolicy
+  }
+
+  override providerAccess(provider: string): LlmProviderAccess | undefined {
+    const snapshot = this.current()
+    const profile = snapshot.profiles.get(provider)
+    if (profile === undefined) return undefined
+    const baseURL = profile.baseURL ?? snapshot.models.getModels(provider)[0]?.baseUrl
+    return {
+      streamIdleTimeoutMs: profile.streamIdleTimeoutMs,
+      ...profile.apiKeyEnv === undefined ? {} : { credentialRef: String(profile.apiKeyEnv) },
+      ...baseURL === undefined ? {} : { baseURL },
+    }
   }
 
   override listModels(provider: string): Promise<readonly LlmModelInfo[]> {

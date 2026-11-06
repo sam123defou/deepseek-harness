@@ -1,0 +1,56 @@
+[
+  {
+    "kind": "throw",
+    "chunks": [],
+    "message": "503 overloaded",
+    "code": "SERVER"
+  },
+  {
+    "kind": "throw",
+    "chunks": [],
+    "message": "503 overloaded",
+    "code": "SERVER"
+  },
+  {
+    "kind": "throw",
+    "chunks": [],
+    "message": "503 overloaded",
+    "code": "SERVER"
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "text"
+      },
+      {
+        "type": "text-delta",
+        "index": 0,
+        "text": "Answered from the next free route."
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "text",
+          "text": "Answered from the next free route."
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 10,
+          "outputTokens": 6
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "stop"
+        }
+      }
+    ]
+  }
+]

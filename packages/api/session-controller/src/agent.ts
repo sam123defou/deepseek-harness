@@ -2,6 +2,7 @@
 
 import { mkdir } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type {
   Agent, AgentOptions, AgentSetup, ModelSelection as AgentModelSelection, ModelSelectionRef,
@@ -375,6 +376,8 @@ export class ApiSessionAgentController {
     readonly agentPreset?: string
     readonly setup: AgentSetup
   }> {
+    // A request can arrive while Loader siblings still mount; an Agent must not run before their route guards exist.
+    await this.ctx.get('loader')?.await()
     const presets = this.ctx.get('agentPresets')
     if (presets === undefined) {
       return { setup: (_agentCtx, agent) => { this.installSelection(agent) } }

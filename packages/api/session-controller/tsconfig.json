@@ -1,6 +1,9 @@
 {
   "files": [],
   "references": [
+    {
+      "path": "../../../vendor/loader"
+    },
     { "path": "./tsconfig.host.json" },
     { "path": "./tsconfig.client.json" }
   ]

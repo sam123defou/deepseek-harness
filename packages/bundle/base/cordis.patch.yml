@@ -107,6 +107,11 @@
     - id: llm-pi-ai
       name: '@deepseek-ai/dsh-llm-pi-ai'
 
+    # Free mode, mounted dormant: no guard and no failover until an `llm-free-mode:`
+    # settings section sets `enabled: true`.
+    - id: llm-free-mode
+      name: '@deepseek-ai/dsh-llm-free-mode'
+
     - id: session-persistence-jsonl
       name: '@deepseek-ai/dsh-session-persistence-jsonl'
       config:

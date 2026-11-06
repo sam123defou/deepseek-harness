@@ -101,6 +101,8 @@ export type WebFetchBody =
  */
 export interface WebSearchProvider {
   readonly id: string
+  /** Whether a search may consume paid credit on the configured account. */
+  readonly billing: 'free' | 'billed'
   /** Cheap local usability check; must not make network calls. */
   available(): boolean
   /** Run one search; honor `signal` for cancellation. */

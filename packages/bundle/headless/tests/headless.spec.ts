@@ -306,6 +306,24 @@ describe('headless runner', () => {
     await test.ctx.fiber.dispose()
   })
 
+  it('prints each free-mode route change on stderr after the answer', async () => {
+    const from = { provider: 'openrouter', model: 'a:free' }
+    const to = { provider: 'openrouter', model: 'b:free' }
+    const test = await bench({
+      afterPrompt(session, message) {
+        session.append('turn/start', { turn: 1 })
+        session.append('llm/failover', { turn: 1, step: 1, from, to, cause: 'saturated', failureCode: 'SERVER', delayMs: 0 })
+        session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+        void message
+      },
+    })
+    expect(await test.run()).toMatchObject({
+      code: 0,
+      err: 'dsh: free mode left openrouter/a:free for openrouter/b:free (saturated)\n',
+    })
+    await test.ctx.fiber.dispose()
+  })
+
   it('prints the durable model failure when the final turn ends in error', async () => {
     const test = await bench({
       afterPrompt(session, message) {

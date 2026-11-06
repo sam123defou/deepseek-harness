@@ -516,6 +516,17 @@ Source: [`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-
 
 ### `llm/*`
 
+<a id="llmfailover--log-only"></a>
+
+#### `llm/failover` — log-only
+
+```ts persistence-catalog
+/** Durable, non-surface record of one route change, or of the end of the failover when `to` is absent. */
+'llm/failover': LlmFailoverEventData
+```
+
+Source: [`packages/llm/llm-free-mode/src/types.ts:29`](../packages/llm/llm-free-mode/src/types.ts)
+
 <a id="llmretry--log-only"></a>
 
 #### `llm/retry` — log-only

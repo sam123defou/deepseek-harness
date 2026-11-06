@@ -32,6 +32,9 @@ describe('dsh-base bundle', () => {
     )
     expect(rows.length).toBeGreaterThan(50)
     expect(rows.some(row => row.id === 'agent-loop')).toBe(true)
+    // Dormant until `llm-free-mode.enabled` is true in settings.
+    expect(rows.find(row => row.id === 'llm-free-mode')).toMatchObject({ name: '@deepseek-ai/dsh-llm-free-mode' })
+    expect(manifest.dependencies?.['@deepseek-ai/dsh-llm-free-mode']).toBeDefined()
     expect(rows.find(row => row.id === 'session-telemetry-otel')?.disabled).toBeUndefined()
     expect(rows.find(row => row.id === 'session-telemetry-otel')?.config?.['mode']).toEqual({
       __jsExpr: "process.env.DSH_TELEMETRY_MODE || 'FEEDBACK_ONLY'",

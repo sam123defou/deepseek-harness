@@ -1,3 +1,4 @@
+import type { LlmFailoverEventData } from '@deepseek-ai/dsh-llm-free-mode/types'
 import type {
   AssistantBlock, AssistantMessageNode, CommandNode, CompactionSummaryNode,
   ConversationLocation, ConversationViewNode, ModelRetryNode, RunningToolCall,
@@ -57,6 +58,13 @@ export interface ManualCompactionChatData {
 export interface RetryChatData {
   readonly attempts: readonly ModelRetryNode[]
   readonly current: ModelRetryNode
+}
+
+/** One durable free-mode route change, or the end of the failover when `to` is absent. */
+export interface FailoverChatData extends LlmFailoverEventData {
+  readonly seq: number
+  /** Unix epoch ms from the llm/failover session event. */
+  readonly time: number
 }
 
 /** One provider/model route that contributed a billed request attempt. */

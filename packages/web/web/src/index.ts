@@ -83,6 +83,7 @@ export class WebRuntime extends Service {
   })
 
   private searchProviders = new Map<string, WebSearchProvider>()
+  private searchGuards = new Set<(provider: WebSearchProvider) => void>()
   private fetchProviders = new Map<string, WebFetchProvider>()
   private readonly searchProviderId: string | undefined
   private readonly fetchProviderId: string | undefined
@@ -91,6 +92,21 @@ export class WebRuntime extends Service {
     super(ctx, 'web')
     this.searchProviderId = config.searchProvider ?? process.env.DSH_WEB_SEARCH_PROVIDER
     this.fetchProviderId = config.fetchProvider ?? process.env.DSH_WEB_FETCH_PROVIDER
+  }
+
+  /**
+   * Register a check run on the selected provider before each search, in the
+   * search operation itself. A refusal throws {@link WebError}. Disposed with
+   * the calling fiber.
+   * @param guard - the check that throws to refuse a provider.
+   * @returns the disposer.
+   */
+  registerSearchGuard(guard: (provider: WebSearchProvider) => void): () => void {
+    const dispose = this.ctx.effect(function* (this: WebRuntime) {
+      this.searchGuards.add(guard)
+      yield () => { this.searchGuards.delete(guard) }
+    }.bind(this), 'web.registerSearchGuard()')
+    return () => void dispose()
   }
 
   /**
@@ -142,6 +158,7 @@ export class WebRuntime extends Service {
       providers: this.searchProviders,
       ...this.searchProviderId !== undefined ? { configuredId: this.searchProviderId } : {},
     })
+    for (const guard of this.searchGuards) guard(provider)
     const result = await provider.search(request, signal)
     return capSources(result, request.maxResults)
   }
