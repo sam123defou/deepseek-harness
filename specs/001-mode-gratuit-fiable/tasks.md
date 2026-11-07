@@ -150,7 +150,7 @@ vérifier que les deux problèmes sont signalés
 - [X] T048 Régénérer les catalogues avec `pnpm run gen-config-catalog`, ce qui met à jour `docs/config-catalog.md`
 - [X] T049 Suivre `.agents/skills/dsh-pre-push-checks/SKILL.md` pour choisir les plus petites vérifications qui couvrent le diff, sans lancer la suite complète par défaut, et rapporter seulement les commandes exécutées
 - [X] T050 Exécuter les scénarios de `specs/001-mode-gratuit-fiable/quickstart.md`, corriger les commandes qui ne fonctionnent pas, et confirmer le statut de `openrouter/free` dans `research.md`
-- [ ] T051 Enregistrer un GIF du flux Web réel avec `record-browser-gif` pour la PR, car T024 change un comportement visible
+- [X] T051 Enregistrer un GIF du flux Web réel avec `record-browser-gif` pour la PR, car T024 change un comportement visible
 
 ---
 
