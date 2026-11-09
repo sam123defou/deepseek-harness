@@ -257,6 +257,24 @@ describe('PiAiAdapter provider routing', () => {
     expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
   })
 
+  it('reports route access from the profile, without a credential value, and nothing for a departed route', () => {
+    const adapter = adapterOf({
+      'acme-gateway': {
+        api: 'openai-completions',
+        apiKeyEnv: 'ACME_KEY',
+        baseURL: 'https://acme.test/v1',
+        streamIdleTimeoutMs: 20_000,
+        models: [{ id: 'acme-large' }],
+      },
+    })
+    expect(adapter.providerAccess('acme-gateway')).toEqual({
+      streamIdleTimeoutMs: 20_000,
+      credentialRef: 'ACME_KEY',
+      baseURL: 'https://acme.test/v1',
+    })
+    expect(adapter.providerAccess('departed')).toBeUndefined()
+  })
+
   it('names a route by its displayName, and by its own key once the profiles drop it', () => {
     const adapter = adapterOf({ 'acme-gateway': {
       displayName: 'Acme Gateway',

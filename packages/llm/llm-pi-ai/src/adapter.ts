@@ -338,12 +338,13 @@ export class PiAiAdapter extends LlmAdapter {
   override providerAccess(provider: string): LlmProviderAccess | undefined {
     const snapshot = this.current()
     const profile = snapshot.profiles.get(provider)
-    if (profile === undefined) return undefined
-    const baseURL = profile.baseURL ?? snapshot.models.getModels(provider)[0]?.baseUrl
+    // A resolved profile always lists at least one model; a departed route has neither.
+    const model = snapshot.models.getModels(provider)[0]
+    if (profile === undefined || model === undefined) return undefined
     return {
       streamIdleTimeoutMs: profile.streamIdleTimeoutMs,
       ...profile.apiKeyEnv === undefined ? {} : { credentialRef: String(profile.apiKeyEnv) },
-      ...baseURL === undefined ? {} : { baseURL },
+      baseURL: profile.baseURL ?? model.baseUrl,
     }
   }
 
