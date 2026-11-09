@@ -1,0 +1,39 @@
+{"type":"session","version":4,"id":"{{session:1}}","createdAt":0,"cwd":"{{cwd}}","isSeeded":false,"delegationDepth":0}
+{"type":"permission/preset","data":{"preset":"danger-full-access"}}
+{"type":"sandbox/mode","data":{"mode":"danger-full-access"}}
+{"type":"approval/policy","data":{"policy":"never"}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Every free route is saturated, so this turn stops with the action to take."}],"source":{"kind":"user"},"role":"user","id":"{{message:1}}"}]}}
+{"type":"turn/start","data":{"turn":1}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}
+{"type":"step/start","data":{"turn":1,"step":1}}
+{"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"{{system}}"}],"source":{"kind":"system-prompt"},"id":"{{message:2}}"}},"surfaceOp":"append"}
+{"type":"user/message","data":{"content":[{"type":"text","text":"Every free route is saturated, so this turn stops with the action to take."}],"source":{"kind":"user"},"role":"user","id":"{{message:1}}"},"surfaceOp":"append"}
+{"type":"user/message","data":{"content":[{"type":"text","text":"Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent working directory: \"{{cwd}}\".\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`).\n\nYou are the root agent. Your name is \"lead\".\n\nTo message other agents, use send_message({ agent: \"<agent-name>\", message: \"...\" }).\nUse list_agents({}) to find your collaborator agents and their names."}],"source":{"kind":"runtime-context","form":"snapshot","sections":[{"name":"working-directory:current","text":"Current working directory: \"{{cwd}}\"."},{"name":"sandbox:policy","text":"Current DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations."},{"name":"approval:policy","text":"Approval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."},{"name":"subagent:identity","text":"You are the root agent. Your name is \"lead\".\n\nTo message other agents, use send_message({ agent: \"<agent-name>\", message: \"...\" }).\nUse list_agents({}) to find your collaborator agents and their names."}]},"role":"user","id":"{{message:3}}"},"surfaceOp":"append"}
+{"type":"request/header","data":{"header":{"config":{"provider":"deepseek-official","model":"deepseek-v4-flash"},"tools":"{{tools}}"},"reason":"initial"}}
+{"type":"request/context","data":{"provider":"deepseek-official","model":"deepseek-v4-flash","contextWindow":1000000}}
+{"type":"session/title","data":{"title":"Every free route is saturated,","messageSeqs":[8],"source":{"kind":"fallback"}}}
+{"type":"assistant/attempt","data":{"turn":1,"step":1,"stream":[{"type":"chunk","time":1794193956064,"chunk":{"type":"finish","reason":{"kind":"error","failure":{"message":"503 overloaded","code":"SERVER"}}}}]}}
+{"type":"llm/retry","data":{"retryId":"{{retry:1}}","turn":1,"step":1,"provider":"deepseek-official","mode":"normal","policyKey":"[\"normal\",2,[\"EMPTY_RESPONSE\",\"RATE_LIMIT\",\"SERVER\",\"TIMEOUT\",\"TRANSPORT\"],1,1,0]","retry":1,"maxRetries":2,"delayMs":1,"failure":{"message":"503 overloaded","code":"SERVER"}}}
+{"type":"llm/retry-started","data":{"retryId":"{{retry:1}}","turn":1,"step":1,"retry":1}}
+{"type":"assistant/attempt","data":{"turn":1,"step":1,"stream":[{"type":"chunk","time":1794193956080,"chunk":{"type":"finish","reason":{"kind":"error","failure":{"message":"503 overloaded","code":"SERVER"}}}}]}}
+{"type":"llm/retry","data":{"retryId":"{{retry:1}}","turn":1,"step":1,"provider":"deepseek-official","mode":"normal","policyKey":"[\"normal\",2,[\"EMPTY_RESPONSE\",\"RATE_LIMIT\",\"SERVER\",\"TIMEOUT\",\"TRANSPORT\"],1,1,0]","retry":2,"maxRetries":2,"delayMs":1,"failure":{"message":"503 overloaded","code":"SERVER"}}}
+{"type":"llm/retry-started","data":{"retryId":"{{retry:1}}","turn":1,"step":1,"retry":2}}
+{"type":"assistant/attempt","data":{"turn":1,"step":1,"stream":[{"type":"chunk","time":1794193956096,"chunk":{"type":"finish","reason":{"kind":"error","failure":{"message":"503 overloaded","code":"SERVER"}}}}]}}
+{"type":"llm/failover","data":{"turn":1,"step":1,"from":{"provider":"deepseek-official","model":"deepseek-v4-flash"},"cause":"saturated","failureCode":"SERVER","delayMs":0,"to":{"provider":"deepseek-official","model":"deepseek-v4-pro"}}}
+{"type":"model/selection","data":{"provider":"deepseek-official","model":"deepseek-v4-pro"}}
+{"type":"step/end","data":{"turn":1,"step":1}}
+{"type":"step/start","data":{"turn":1,"step":2}}
+{"type":"system/message","data":{"turn":1,"step":2,"message":{"role":"system","content":[{"type":"text","text":"{{system}}"}],"source":{"kind":"system-prompt"},"id":"{{message:4}}"}},"sourceEventSeqs":[7],"surfaceOp":{"op":"replace","startSeq":7,"endSeq":7}}
+{"type":"user/message","data":{"content":[{"type":"text","text":"[model changed: assistant turns above this point were generated by deepseek-v4-flash; the session continues with deepseek-v4-pro]"}],"source":{"kind":"model-selection","form":"notice","summary":"deepseek-v4-flash → deepseek-v4-pro"},"role":"user","id":"{{message:5}}"},"surfaceOp":"append"}
+{"type":"request/header","data":{"header":{"config":{"provider":"deepseek-official","model":"deepseek-v4-pro"},"tools":"{{tools}}"},"reason":"change","startsSeries":true}}
+{"type":"request/context","data":{"provider":"deepseek-official","model":"deepseek-v4-pro","contextWindow":1000000}}
+{"type":"assistant/attempt","data":{"turn":1,"step":2,"stream":[{"type":"chunk","time":1794193956137,"chunk":{"type":"finish","reason":{"kind":"error","failure":{"message":"503 overloaded","code":"SERVER"}}}}]}}
+{"type":"llm/retry","data":{"retryId":"{{retry:2}}","turn":1,"step":2,"provider":"deepseek-official","mode":"normal","policyKey":"[\"normal\",2,[\"EMPTY_RESPONSE\",\"RATE_LIMIT\",\"SERVER\",\"TIMEOUT\",\"TRANSPORT\"],1,1,0]","retry":1,"maxRetries":2,"delayMs":1,"failure":{"message":"503 overloaded","code":"SERVER"}}}
+{"type":"llm/retry-started","data":{"retryId":"{{retry:2}}","turn":1,"step":2,"retry":1}}
+{"type":"assistant/attempt","data":{"turn":1,"step":2,"stream":[{"type":"chunk","time":1794193956152,"chunk":{"type":"finish","reason":{"kind":"error","failure":{"message":"503 overloaded","code":"SERVER"}}}}]}}
+{"type":"llm/retry","data":{"retryId":"{{retry:2}}","turn":1,"step":2,"provider":"deepseek-official","mode":"normal","policyKey":"[\"normal\",2,[\"EMPTY_RESPONSE\",\"RATE_LIMIT\",\"SERVER\",\"TIMEOUT\",\"TRANSPORT\"],1,1,0]","retry":2,"maxRetries":2,"delayMs":1,"failure":{"message":"503 overloaded","code":"SERVER"}}}
+{"type":"llm/retry-started","data":{"retryId":"{{retry:2}}","turn":1,"step":2,"retry":2}}
+{"type":"assistant/attempt","data":{"turn":1,"step":2,"stream":[{"type":"chunk","time":1794193956166,"chunk":{"type":"finish","reason":{"kind":"error","failure":{"message":"503 overloaded","code":"SERVER"}}}}]}}
+{"type":"llm/failover","data":{"turn":1,"step":2,"from":{"provider":"deepseek-official","model":"deepseek-v4-pro"},"cause":"saturated","failureCode":"SERVER","delayMs":0}}
+{"type":"step/end","data":{"turn":1,"step":2}}
+{"type":"turn/end","data":{"turn":1,"reason":{"kind":"error","error":{"message":"503 overloaded","code":"SERVER"}}}}

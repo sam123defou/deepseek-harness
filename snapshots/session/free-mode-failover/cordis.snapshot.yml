@@ -1,0 +1,62 @@
+# Keyless replay for the free-mode overlay: disable the key-requiring DeepSeek
+# adapter and insert `llm-replay` with the same retry policy and context windows.
+- id: llm-deepseek
+  name: '@deepseek-ai/dsh-llm-deepseek-api-key'
+  disabled: true
+
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-flash
+
+- id: session-persistence-jsonl
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: !!js dshHomePath('sessions')
+    compression: none
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+  config:
+    personaPrefix: |
+      You are a coding assistant powered by the {{model}} model. Your bash tool runs under a file sandbox — a `[sandbox: file access denied …]` result is policy, not a command bug.
+
+      Verify your work by running the code or tests. Keep answers brief and factual.
+
+- insert:
+    - id: llm-replay
+      name: '@deepseek-ai/dsh-llm-replay'
+      config:
+        providers:
+          - id: deepseek-official
+            name: DeepSeek
+            retryPolicy:
+              mode: normal
+              maxRetries: 2
+              backoff:
+                initialDelayMs: 1
+                maxDelayMs: 1
+                jitterRatio: 0
+            models:
+              - id: deepseek-v4-flash
+                contextWindow: 1000000
+              - id: deepseek-v4-pro
+                contextWindow: 1000000
+
+- id: llm-free-mode
+  name: '@deepseek-ai/dsh-llm-free-mode'
+  config:
+    enabled: true
+    routes:
+      - provider: deepseek-official
+        model: deepseek-v4-flash
+        freeTierConfirmed: true
+      - provider: deepseek-official
+        model: deepseek-v4-pro
+        freeTierConfirmed: true

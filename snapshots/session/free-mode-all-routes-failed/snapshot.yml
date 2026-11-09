@@ -1,7 +1,7 @@
 version: 1
 scenario: free-mode-all-routes-failed
 profile: headless
-composition: retry
+composition: free-mode
 recording: authored
 header:
   class: free-mode
