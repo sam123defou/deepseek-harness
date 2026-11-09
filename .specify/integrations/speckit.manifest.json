@@ -1,6 +1,6 @@
 {
   "integration": "speckit",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "installed_at": "2026-11-05T22:09:28.130297+00:00",
   "files": {
     ".specify/scripts/bash/resolve-template.sh": "829e227096abc8bf0889889ec9f792f503ca5d395b7836a8a7eb739ee75214e7",
