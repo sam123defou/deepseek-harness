@@ -4,11 +4,11 @@ import AgentRegistry, { type ModelSelection } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { ReasoningEffortId, type LlmRuntime } from '@deepseek-ai/dsh-llm'
-import { AcpModelControl } from '../src/model-control.ts'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { AcpModelControl, type AcpModelCatalog } from '../src/model-control.ts'
 
 /** Minimal LLM catalog/runtime double for pure standard-option tests. */
-function llmRuntime(overrides: Partial<LlmRuntime> = {}): LlmRuntime {
+function llmRuntime(overrides: Partial<AcpModelCatalog> = {}): AcpModelCatalog {
   return {
     checkRoute: () => Promise.resolve(),
     listProviders: () => [{ id: 'mock', name: 'Mock' }],
@@ -33,10 +33,10 @@ function llmRuntime(overrides: Partial<LlmRuntime> = {}): LlmRuntime {
       },
     }),
     ...overrides,
-  } as unknown as LlmRuntime
+  }
 }
 
-async function createControl(runtime: LlmRuntime, initial?: ModelSelection) {
+async function createControl(runtime: AcpModelCatalog, initial?: ModelSelection) {
   const ctx = new Context()
   onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SessionStore)
@@ -55,9 +55,7 @@ describe('ACP model configuration control', () => {
     const { control, session, model } = await createControl(llmRuntime({
       checkRoute: () => Promise.reject(new Error('free mode refused this route')),
     }), initial)
-    const [option] = await control.options()
-    const group = (option as unknown as { options: { options: { value: string }[] }[] }).options[0]
-    await expect(control.set('model', group?.options[0]?.value)).rejects.toThrow('free mode refused this route')
+    await expect(control.set('model', JSON.stringify(['mock', 'mock']))).rejects.toThrow('free mode refused this route')
     expect(model.current()).toEqual(initial)
     expect(session.snapshotEvents()).toEqual([])
   })

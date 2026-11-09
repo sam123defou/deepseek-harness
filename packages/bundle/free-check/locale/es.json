@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Perfil de comprobación del modo gratuito",
+    "description": "Indique si el modo gratuito puede ejecutarse, incluidas credenciales, modelos disponibles, precios y cuota diaria, sin enviar ninguna solicitud de modelo."
+  }
+}

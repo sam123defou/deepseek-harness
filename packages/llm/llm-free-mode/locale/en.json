@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Free mode",
+    "description": "Route model requests through free providers and switch to the next free route when one fails."
+  }
+}

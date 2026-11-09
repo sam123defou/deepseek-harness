@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Context } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { AcpSession } from '../src/session.ts'
 import type { CreateAcpSessionOptions, ResumeAcpSessionOptions } from '../src/session.ts'
 
@@ -10,18 +11,29 @@ function fixture() {
   const settled = new Promise<void>((resolve) => { settle = resolve })
   const create = vi.fn(() => Promise.reject(stopped))
   const resume = vi.fn(() => Promise.reject(stopped))
-  const ctx = {
-    get: (name: string) => name === 'loader' ? { await: () => settled } : undefined,
-    llm: {},
-    agents: { create, resume },
-  } as unknown as Context
+  const ctx = new Context()
+  ctx.provide('loader')
+  ctx.provide('agents')
+  ctx.set('loader', { await: () => settled })
+  ctx.set('agents', { create, resume })
   return { ctx, settle, create, resume }
+}
+
+function options(): CreateAcpSessionOptions & ResumeAcpSessionOptions {
+  return {
+    sessionId: SessionId('acp-startup'),
+    cwd: '/',
+    mcpServers: [],
+    agentOptions: {},
+    signal: new AbortController().signal,
+    notify: () => Promise.resolve(),
+  }
 }
 
 describe('AcpSession startup', () => {
   it('creates no Agent before the Loader has settled', async () => {
     const { ctx, settle, create } = fixture()
-    const pending = AcpSession.create(ctx, { mcpServers: [] } as unknown as CreateAcpSessionOptions)
+    const pending = AcpSession.create(ctx, options())
     await new Promise(resolve => setImmediate(resolve))
     expect(create).not.toHaveBeenCalled()
 
@@ -32,7 +44,7 @@ describe('AcpSession startup', () => {
 
   it('resumes no Agent before the Loader has settled', async () => {
     const { ctx, settle, resume } = fixture()
-    const pending = AcpSession.resume(ctx, { mcpServers: [] } as unknown as ResumeAcpSessionOptions)
+    const pending = AcpSession.resume(ctx, options())
     await new Promise(resolve => setImmediate(resolve))
     expect(resume).not.toHaveBeenCalled()
 

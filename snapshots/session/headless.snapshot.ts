@@ -9,6 +9,7 @@ import { basename, delimiter, dirname, isAbsolute, join, relative, sep } from 'n
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import ts from 'typescript'
+import { z } from 'zod'
 import { describeFailover } from '@deepseek-ai/dsh-llm-free-mode'
 import type { LlmFailoverEventData } from '@deepseek-ai/dsh-llm-free-mode/types'
 import { deriveEventMessage, foldSurface, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
@@ -387,6 +388,19 @@ function turnReasonFromSession(log: string): JsonObject | undefined {
   return endings.at(-1)
 }
 
+const failoverRouteSchema = z.object({ provider: z.string(), model: z.string() })
+
+/** Recorded `llm/failover` payload read back from a Session log line. */
+const failoverEventDataSchema: z.ZodType<LlmFailoverEventData> = z.object({
+  turn: z.number(),
+  step: z.number(),
+  from: failoverRouteSchema,
+  to: failoverRouteSchema.optional(),
+  cause: z.enum(['saturated', 'rate-limited', 'unavailable', 'invalid-request', 'quota-exhausted', 'credential-missing', 'auth-refused', 'context-exceeded', 'unknown']),
+  failureCode: z.string(),
+  delayMs: z.number(),
+})
+
 function stderrFromSession(log: string): string {
   let output = ''
   let started = false
@@ -467,7 +481,7 @@ function stderrFromSession(log: string): string {
   }
   close()
   for (const record of records(log)) {
-    if (record.type === 'llm/failover') output += `dsh: ${describeFailover(record.data as unknown as LlmFailoverEventData)}\n`
+    if (record.type === 'llm/failover') output += `dsh: ${describeFailover(failoverEventDataSchema.parse(record.data))}\n`
   }
   const reason = turnReasonFromSession(log)
   if (reason?.kind !== 'error') return output

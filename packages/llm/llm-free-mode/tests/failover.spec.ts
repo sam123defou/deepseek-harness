@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionSeq, type SessionEvent } from '@deepseek-ai/dsh-session'
 import {
   abandonsProvider,
   applyFailoverEvent,
@@ -17,9 +17,9 @@ const B = { provider: 'openrouter', model: 'b:free' }
 const G = { provider: 'groq', model: 'g', freeTierConfirmed: true }
 const ROUTES = [A, B, G]
 
-function failover(cause: FailureCause, time = 100): SessionEvent {
+function failover(cause: FailureCause, time = 100): SessionEvent<'llm/failover'> {
   const data: LlmFailoverEventData = { turn: 1, step: 1, from: A, to: B, cause, failureCode: 'X', delayMs: 0 }
-  return { type: 'llm/failover', seq: 1, time, data } as unknown as SessionEvent
+  return { type: 'llm/failover', seq: SessionSeq(1), time, data }
 }
 
 describe('failureCause()', () => {

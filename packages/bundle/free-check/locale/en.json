@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Free mode check profile",
+    "description": "Report whether free mode can run, covering credentials, listed models, prices, and daily quota, without sending a model request."
+  }
+}

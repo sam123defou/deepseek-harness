@@ -5,6 +5,7 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import type { FailureCause } from '@deepseek-ai/dsh-llm-free-mode/types'
 import { FailoverNodeView } from '../src/client/chat/MessageItem.tsx'
+import type { FailoverChatData } from '../src/client/contract/chat-nodes.ts'
 import type { ChatNodeViewProps } from '../src/client/contract/slots.ts'
 import { en } from '../src/client/locale.ts'
 
@@ -16,8 +17,8 @@ const t = makeTranslate(en, commonEn)
 const from = { provider: 'openrouter', model: 'first:free' }
 
 function row(cause: FailureCause, to?: { provider: string; model: string }): string | null {
-  const data = { seq: 1, time: 1, turn: 1, step: 1, from, cause, failureCode: 'CODE', delayMs: 0, ...(to === undefined ? {} : { to }) }
-  const props = { node: { data }, t } as unknown as ChatNodeViewProps<'model-failover'>
+  const data: FailoverChatData = { seq: 1, time: 1, turn: 1, step: 1, from, cause, failureCode: 'CODE', delayMs: 0, ...(to === undefined ? {} : { to }) }
+  const props = { node: { data }, t } as ChatNodeViewProps<'model-failover'>
   const view = render(<FailoverNodeView {...props} />)
   const text = view.getByRole('status').textContent
   view.unmount()

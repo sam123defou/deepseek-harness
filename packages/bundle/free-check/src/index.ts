@@ -8,7 +8,7 @@ import { Command } from 'commander'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { parseCmdline } from '@deepseek-ai/dsh-cmdline'
-import { attributionHeaders } from '@deepseek-ai/dsh-llm'
+import { attributionHeaders, type LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { LlmFreeMode, FreeModeQuota, FreeRouteKey, RouteProblem } from '@deepseek-ai/dsh-llm-free-mode'
 import { z } from 'zod'
 
@@ -77,14 +77,20 @@ function catalogState(route: FreeRouteKey, catalog: Catalog | undefined): RouteR
     : { ...route, state: 'model-now-paid', action: 'remove this model from llm-free-mode.routes' }
 }
 
+/** The free-mode and provider-access reads that {@link diagnose} performs. */
+export interface FreeCheckServices {
+  freeMode: Pick<LlmFreeMode, 'currentSettings' | 'checkRoutes' | 'hasCatalog' | 'readQuota'>
+  llm: Pick<LlmRuntime, 'providerAccess'>
+}
+
 /**
  * Build the report. The two reads per provider run together so the command
  * stays within one network timeout.
  * @param ctx - context carrying `freeMode` and `llm`.
  * @returns the complete report.
  */
-export async function diagnose(ctx: Pick<Context, 'freeMode' | 'llm'>): Promise<FreeCheckReport> {
-  const freeMode: LlmFreeMode = ctx.freeMode
+export async function diagnose(ctx: FreeCheckServices): Promise<FreeCheckReport> {
+  const freeMode = ctx.freeMode
   const settings = freeMode.currentSettings()
   const issues = await freeMode.checkRoutes()
   const providers = [...new Set(settings.routes.map(route => route.provider))]

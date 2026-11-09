@@ -27,6 +27,9 @@ export class AcpModelConfigError extends Error {
   }
 }
 
+/** The catalog, route-guard, and resolution members of {@link LlmRuntime} that {@link AcpModelControl} reads. */
+export type AcpModelCatalog = Pick<LlmRuntime, 'checkRoute' | 'listProviders' | 'listModels' | 'resolveModelInfo' | 'resolveCallConfig'>
+
 /**
  * Project and mutate one Agent's provider/model/reasoning selection through ACP
  * config options. The Session's recorded model selection is the only state; a
@@ -37,7 +40,7 @@ export class AcpModelControl {
   private hasResolvedState = false
 
   constructor(
-    private readonly llm: LlmRuntime,
+    private readonly llm: AcpModelCatalog,
     private readonly model: Model,
   ) {}
 
@@ -66,7 +69,6 @@ export class AcpModelControl {
         const state = await this.state(signal)
         const selected = state.choices.get(value)
         if (selected === undefined) throw new AcpModelConfigError(`unknown model option: ${value}`)
-        await this.llm.checkRoute(selected)
         await this.llm.checkRoute(selected)
         await this.resolveSelection(selected, signal)
         this.model.select(selected)

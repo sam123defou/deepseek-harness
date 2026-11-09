@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Context } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
+import type { RouteIssue } from '@deepseek-ai/dsh-llm-free-mode'
 import { apply, diagnose, exitCode, renderReport } from '../src/index.ts'
-import type { FreeCheckReport } from '../src/index.ts'
+import type { FreeCheckReport, FreeCheckServices } from '../src/index.ts'
 
 const SECRET = 'sk-test-value'
 const A = { provider: 'openrouter', model: 'a:free' }
@@ -10,10 +11,12 @@ const C = { provider: 'openrouter', model: 'c:free' }
 const G = { provider: 'groq', model: 'g', freeTierConfirmed: true }
 const free = { prompt: '0', completion: '0' }
 
-function context(issues: unknown[] = [], enabled = true): Pick<Context, 'freeMode' | 'llm'> {
+function context(issues: RouteIssue[] = [], enabled = true): FreeCheckServices {
   return {
     freeMode: {
-      currentSettings: () => ({ enabled, routes: [A, B, C, G], networkTimeoutMs: 1000 }),
+      currentSettings: () => ({
+        enabled, routes: [A, B, C, G], rateLimitDelayMs: 0, maxFailoverMs: 1000, maxRouteIdleMs: 1000, networkTimeoutMs: 1000,
+      }),
       checkRoutes: () => Promise.resolve(issues),
       hasCatalog: (provider: string) => provider === 'openrouter',
       readQuota: (provider: string) => Promise.resolve(provider === 'openrouter'
@@ -21,7 +24,7 @@ function context(issues: unknown[] = [], enabled = true): Pick<Context, 'freeMod
         : { provider, state: 'unknown' }),
     },
     llm: { providerAccess: () => ({ baseURL: 'https://openrouter.ai/api/v1' }) },
-  } as unknown as Pick<Context, 'freeMode' | 'llm'>
+  }
 }
 
 function catalog(models: unknown[], status = 200): void {
@@ -99,12 +102,17 @@ describe('renderReport()', () => {
 })
 
 describe('apply()', () => {
-  function mount(args: string[], ctx: Record<string, unknown>) {
+  function mount(args: string[], services: FreeCheckServices) {
     const exit = vi.fn()
     const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
     const errors = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
-    const services: Record<string, unknown> = { appExit: exit, cmdlineArgs: { get: () => args } }
-    apply({ ...ctx, get: (name: string) => services[name] } as unknown as Context)
+    const ctx = new Context()
+    for (const name of ['appExit', 'cmdlineArgs', 'freeMode', 'llm']) ctx.provide(name)
+    ctx.set('appExit', exit)
+    ctx.set('cmdlineArgs', { get: () => args })
+    ctx.set('freeMode', services.freeMode)
+    ctx.set('llm', services.llm)
+    apply(ctx)
     return { exit, write, errors }
   }
 
@@ -138,6 +146,6 @@ describe('apply()', () => {
   })
 
   it('requires the launcher exit request', () => {
-    expect(() => { apply({ get: () => undefined } as unknown as Context) }).toThrow('ctx.appExit')
+    expect(() => { apply(new Context()) }).toThrow('ctx.appExit')
   })
 })

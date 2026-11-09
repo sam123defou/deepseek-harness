@@ -23,6 +23,7 @@ import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import WebRuntime from '@deepseek-ai/dsh-web'
 import LlmFreeMode from '../src/index.ts'
 import type { FreeModeSettings } from '../src/index.ts'
+import { fixtureModuleLoader } from './module-loader.ts'
 
 const FIRST = { provider: 'openrouter', model: 'first:free' }
 const LISTED = [
@@ -103,13 +104,7 @@ async function load(): Promise<{ loaded: Context; adapter: PaidKeyAdapter }> {
   loaded.baseUrl = pathToFileURL(root).href + '/'
   await loaded.plugin(Loader)
   loaded.loader.builtins.include = Include
-  loaded.loader.internal = {
-    version: 'v2',
-    async import(specifier: string) {
-      if (!MODULES.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
-      return MODULES.get(specifier)
-    },
-  } as unknown as NonNullable<typeof loaded.loader.internal>
+  loaded.loader.internal = fixtureModuleLoader(MODULES)
   await loaded.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(configPath).href } })
   await loaded.loader.await()
   const adapter = new PaidKeyAdapter()

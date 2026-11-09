@@ -27,6 +27,7 @@ import ToolRuntime from '@deepseek-ai/dsh-tools'
 import WebRuntime, { WebError } from '@deepseek-ai/dsh-web'
 import LlmFreeMode from '../src/index.ts'
 import type { FreeModeSettings } from '../src/index.ts'
+import { fixtureModuleLoader } from './module-loader.ts'
 
 const SECTION: Partial<FreeModeSettings> = {
   enabled: true,
@@ -136,13 +137,7 @@ async function load(order: readonly string[] = [RETRY, FREE]): Promise<Context> 
     [RETRY, retry],
     [FREE, LlmFreeMode],
   ])
-  context.loader.internal = {
-    version: 'v2',
-    async import(specifier: string) {
-      if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
-      return modules.get(specifier)
-    },
-  } as unknown as NonNullable<typeof context.loader.internal>
+  context.loader.internal = fixtureModuleLoader(modules)
   await context.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(configPath).href } })
   await context.loader.await()
   return context
