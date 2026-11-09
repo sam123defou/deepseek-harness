@@ -1,0 +1,26 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {"key":"event:llm/failover","kind":"event","event":"llm/failover","surface":false,"digest":"b31df74b95489fa424e2ab5ce2eb35b16193842770c37722126184d20b24da96"}
+  ],
+  "types": [],
+  "nodes": {
+    "05a2796621b1ee6c": {"kind":"literal","value":"unknown"},
+    "0657d3ca5ac4e7bf": {"kind":"primitive","type":"number"},
+    "07e1a58c58b593f5": {"kind":"object","properties":[{"name":"model","type":"4cd48f3e5108bd6e","optional":false},{"name":"provider","type":"4cd48f3e5108bd6e","optional":false}],"indices":[]},
+    "0dd50760e812ef87": {"kind":"literal","value":"invalid-request"},
+    "2c4c21f19f426a58": {"kind":"literal","value":"unavailable"},
+    "2cd899261a07d9ef": {"kind":"union","types":["05a2796621b1ee6c","0dd50760e812ef87","2c4c21f19f426a58","34efada68fdb1cec","6fa7e41ac6103e24","93540457534d8e68","a09927b33c8498b8","c7aa60b157aa1224","e6dc82635cb46855"]},
+    "34efada68fdb1cec": {"kind":"literal","value":"auth-refused"},
+    "4cd48f3e5108bd6e": {"kind":"primitive","type":"string"},
+    "6fa7e41ac6103e24": {"kind":"literal","value":"saturated"},
+    "93540457534d8e68": {"kind":"literal","value":"credential-missing"},
+    "a09927b33c8498b8": {"kind":"literal","value":"quota-exhausted"},
+    "b31df74b95489fa4": {"kind":"object","properties":[{"name":"data","type":"d1a8773ffaeab843","optional":false},{"name":"ignorable","type":"dacf3d5f3e4ff619","optional":true},{"name":"seq","type":"0657d3ca5ac4e7bf","optional":false},{"name":"time","type":"0657d3ca5ac4e7bf","optional":false},{"name":"type","type":"ca497d1f4ce8cde1","optional":false}],"indices":[]},
+    "c7aa60b157aa1224": {"kind":"literal","value":"rate-limited"},
+    "ca497d1f4ce8cde1": {"kind":"literal","value":"llm/failover"},
+    "d1a8773ffaeab843": {"kind":"object","properties":[{"name":"cause","type":"2cd899261a07d9ef","optional":false},{"name":"delayMs","type":"0657d3ca5ac4e7bf","optional":false},{"name":"failureCode","type":"4cd48f3e5108bd6e","optional":false},{"name":"from","type":"07e1a58c58b593f5","optional":false},{"name":"step","type":"0657d3ca5ac4e7bf","optional":false},{"name":"to","type":"07e1a58c58b593f5","optional":true},{"name":"turn","type":"0657d3ca5ac4e7bf","optional":false}],"indices":[]},
+    "dacf3d5f3e4ff619": {"kind":"literal","value":true},
+    "e6dc82635cb46855": {"kind":"literal","value":"context-exceeded"}
+  }
+}

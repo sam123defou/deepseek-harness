@@ -1,18 +1,14 @@
 /**
- * Free-mode settings: schema, self-contained validation, and route checks that
- * need the LLM registry and the credential service.
+ * Free-mode settings: self-contained validation and route checks that need the
+ * LLM registry and the credential service.
  * @module @deepseek-ai/dsh-llm-free-mode/config
  */
 
-import z from '@deepseek-ai/schemastery'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { FreeRouteKey } from './types.ts'
-
-/** Settings namespace owned by this plugin. */
-export const FREE_MODE_SETTINGS_NAMESPACE = 'llm-free-mode'
 
 /** Provider route whose free models carry a documented marker. */
 const OPENROUTER_PROVIDER = 'openrouter'
@@ -25,39 +21,21 @@ export interface FreeRoute extends FreeRouteKey {
   freeTierConfirmed?: boolean
 }
 
-/** User-editable free-mode section. */
+/** Live free-mode settings read from the plugin's volatile Config fields. */
 export interface FreeModeSettings {
   /** `false` keeps `routes` and removes every guard and the failover. */
   enabled: boolean
   /** Routes in priority order. */
-  routes: FreeRoute[]
+  routes: readonly FreeRoute[]
   /** Wait before leaving a route after a rate limit, in milliseconds. */
   rateLimitDelayMs: number
-  /** Longest failover duration inside one step, in milliseconds. */
+  /** Longest duration of one failover chain, in milliseconds. */
   maxFailoverMs: number
   /** Largest accepted provider `streamIdleTimeoutMs`, in milliseconds. */
   maxRouteIdleMs: number
   /** Limit of each quota or catalog read, in milliseconds. */
   networkTimeoutMs: number
 }
-
-const SETTINGS_KEYS: ReadonlySet<string> = new Set([
-  'enabled', 'routes', 'rateLimitDelayMs', 'maxFailoverMs', 'maxRouteIdleMs', 'networkTimeoutMs',
-])
-
-/** Schema of the `llm-free-mode` settings section. */
-export const FreeModeSettingsSchema: z<FreeModeSettings> = z.object({
-  enabled: z.boolean().default(false),
-  routes: z.array(z.object({
-    provider: z.string().required(),
-    model: z.string().required(),
-    freeTierConfirmed: z.boolean(),
-  })).default([]),
-  rateLimitDelayMs: z.natural().default(5_000),
-  maxFailoverMs: z.natural().default(55_000),
-  maxRouteIdleMs: z.natural().default(20_000),
-  networkTimeoutMs: z.natural().default(10_000),
-})
 
 /** Compare two routes by provider and model. */
 export function sameRoute(left: FreeRouteKey, right: FreeRouteKey): boolean {
@@ -73,17 +51,12 @@ function isOpenRouterFree(model: string): boolean {
 }
 
 /**
- * Validate the checks that need no other service. A disabled section is not
- * checked for list contents, so leaving free mode never loses or rejects it.
- * @param settings - schema-valid section read from settings or composition.
+ * Validate the checks that need no other service. Disabled settings are not
+ * checked for list contents, so leaving free mode never loses or rejects them.
+ * @param settings - schema-valid settings read from the plugin Config.
  * @throws LlmError naming the route and the expected action.
  */
 export function validateFreeModeSettings(settings: FreeModeSettings): void {
-  for (const key of Object.keys(settings)) {
-    if (!SETTINGS_KEYS.has(key)) {
-      throw new LlmError(`llm-free-mode: unknown settings key "${key}"`, 'INVALID_CONFIG')
-    }
-  }
   if (!settings.enabled) return
   if (settings.routes.length === 0) {
     throw new LlmError('llm-free-mode: add at least one route to `routes`, or set `enabled: false`', 'FREE_MODE_EMPTY_LIST')

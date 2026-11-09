@@ -4,12 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import AgentRegistry, { installModelSelection } from '@deepseek-ai/dsh-agent'
-import type { Agent, ModelSelectionRef } from '@deepseek-ai/dsh-agent'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import LlmRuntime, { createUserMessage, LlmAdapter, LlmError, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 import type {
   GenerateOptions,
@@ -39,26 +40,6 @@ const SECTION: Partial<FreeModeSettings> = {
 }
 
 let section: Partial<FreeModeSettings> = SECTION
-
-/** Minimal settings service: one in-memory user section over the composition entry. */
-class MemorySettings extends Service {
-  constructor(ctx: Context) {
-    super(ctx, 'settings')
-  }
-
-  installSection(
-    _owner: Context,
-    _ns: string,
-    schema: (value: unknown) => FreeModeSettings,
-    entry: FreeModeSettings,
-    hooks: { validate?: (value: FreeModeSettings) => void; setSource(source: () => FreeModeSettings): void; onChange(): void },
-  ): void {
-    const value = schema({ ...entry, ...section })
-    hooks.validate?.(value)
-    hooks.setSource(() => value)
-    hooks.onChange()
-  }
-}
 
 type Outcome = 'ok' | Error
 
@@ -125,8 +106,8 @@ const ROWS = [
   '@deepseek-ai/dsh-session-projection',
   '@deepseek-ai/dsh-system-prompt',
   '@deepseek-ai/dsh-tools',
+  '@deepseek-ai/dsh-tool-executor-native',
   '@deepseek-ai/dsh-agent',
-  '@deepseek-ai/dsh-settings',
   '@deepseek-ai/dsh-web',
   '@deepseek-ai/dsh-agent-loop',
 ]
@@ -136,7 +117,8 @@ const FREE = '@deepseek-ai/dsh-llm-free-mode'
 async function load(order: readonly string[] = [RETRY, FREE]): Promise<Context> {
   root = await mkdtemp(join(tmpdir(), 'dsh-free-mode-'))
   const configPath = join(root, 'cordis.yml')
-  await writeFile(configPath, [...ROWS, ...order].map(name => `- name: '${name}'`).join('\n') + '\n')
+  const row = (name: string) => name === FREE ? `- name: '${name}'\n  config: ${JSON.stringify(section)}` : `- name: '${name}'`
+  await writeFile(configPath, [...ROWS, ...order].map(row).join('\n') + '\n')
   context = new Context()
   context.baseUrl = pathToFileURL(root).href + '/'
   await context.plugin(Loader)
@@ -147,8 +129,8 @@ async function load(order: readonly string[] = [RETRY, FREE]): Promise<Context> 
     ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', ToolRuntime],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
     ['@deepseek-ai/dsh-agent', AgentRegistry],
-    ['@deepseek-ai/dsh-settings', MemorySettings],
     ['@deepseek-ai/dsh-web', WebRuntime],
     ['@deepseek-ai/dsh-agent-loop', AgentLoop],
     [RETRY, retry],
@@ -169,17 +151,11 @@ async function load(order: readonly string[] = [RETRY, FREE]): Promise<Context> 
 async function run(
   loaded: Context,
   first = { provider: 'openrouter', model: 'first:free' },
-  install = true,
 ): Promise<Agent> {
   const { agent } = await loaded.agents.create({
     sessionId: SessionId(`free-mode-${randomUUID()}`),
     meta: {},
     agentOptions: first,
-    setup: (agentCtx) => {
-      if (!install) return
-      const selected: ModelSelectionRef = { current: first, assembled: undefined }
-      installModelSelection(agentCtx, selected)
-    },
   })
   await agent.whenIdle()
   agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
@@ -297,16 +273,6 @@ describe('real Loader composition', () => {
     await expect(loaded.freeMode.checkRoutes()).resolves.toMatchObject([{ problem: 'model-not-configured' }])
     const agent = await run(loaded)
     expect(failovers(agent)).toMatchObject([{ to: { model: 'third:free' } }])
-  })
-
-  it('stops with the original failure when the Agent has no model selection', { timeout: 60_000 }, async () => {
-    const loaded = await load()
-    const adapter = new ScriptedAdapter({ 'first:free': [serverDown()] })
-    loaded.llm.registerAdapter(['openrouter', 'groq'], adapter)
-    const agent = await run(loaded, { provider: 'openrouter', model: 'first:free' }, false)
-    expect(failovers(agent)).toMatchObject([{ cause: 'saturated' }])
-    expect(failovers(agent)[0]?.to).toBeUndefined()
-    expect(new Set(adapter.requests)).toEqual(new Set(['openrouter/first:free']))
   })
 
   it('refuses an unlisted route without contacting the provider', { timeout: 60_000 }, async () => {
@@ -455,7 +421,6 @@ describe('real Loader composition', () => {
       sessionId: SessionId('free-mode-cancel'),
       meta: {},
       agentOptions: first,
-      setup: (agentCtx) => { installModelSelection(agentCtx, { current: first, assembled: undefined }) },
     })
     await agent.whenIdle()
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))

@@ -10,11 +10,11 @@ Status: implemented
 
 ## Decision
 
-`dsh-llm-free-mode` 在 `llm-free-mode` 设置段中保存有序的允许列表。`dsh-base` 按 `llm-pi-ai` 的方式以休眠状态挂载它，因为指向不存在条目的用户补丁行只会发出警告，保护会在没有错误的情况下缺失。
+`dsh-llm-free-mode` 在其 `llm-free-mode` 条目 Config 的 volatile 字段中保存有序的允许列表，因此实时修改无需重新加载即可生效，原 `settings.yaml` 中的设置段会被一次性导入该条目。`dsh-base` 按 `llm-pi-ai` 的方式以休眠状态挂载它，因为指向不存在条目的用户补丁行只会发出警告，保护会在没有错误的情况下缺失。
 
 拒绝在 `LlmRuntime.prepareCall()` 和 `adapterStream()` 中通过 `registerRouteGuard()` 执行，在 `WebRuntime.search()` 中通过 `registerSearchGuard()` 执行。`llm/stream` 监听器不算强制执行，因为其他监听器可能先结束这条链。
 
-故障切换使用现有的 `agent/request-error` waterfall 和 `{ kind: 'retry' }`，因为 `step()` 在每次尝试时都会重新运行 `prepareRequest()`。`agent-loop` 不变。选择引用是每个入口点私有的，因此由新的 `agent/model-reroute` 事件到达它；单纯的 `agent/request` 监听器会让选择与已记录的请求头不一致，并产生错误的模型变更提示。监听器先委托下游，使结果不依赖注册顺序，因为行顺序没有加载语义。
+故障切换使用 `agent/request-error` waterfall 及其 `{ kind: 'next-step' }` 动作。步骤在首次请求前固定模型选择，且 `agent/request` 拒绝更改 provider 或模型，因此故障切换通过 `agent.model.select()` 记录下一条路由，循环则在重新快照选择的新步骤中继续该轮次。持久的 `model/selection` 事件使路由变更与模型切换提示可从日志重建。由于每次路由变更都会打开新步骤，`llmFailover` 投影在 `assistant/message` 与 `turn/end` 时重置，而不是在 `step/start` 时；否则每个新步骤都会忘记已尝试过的路由。监听器先委托下游，使结果不依赖注册顺序，因为行顺序没有加载语义。
 
 每日限制从 `GET /api/v1/key` 读取，因为 429 响应体不区分分钟限制和每日限制，而 pi-ai 会丢弃响应头。
 

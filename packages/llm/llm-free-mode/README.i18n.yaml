@@ -1,6 +1,55 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/llm/llm-free-mode/README.md
-README.md: 0088ee2c1880bda667177969686080605baf3237
-README.zh.md: b290078d6fbf70cc91f899343775daf2566414ad
+/:
+  en: f0a92a66a117a8b5
+  zh: e470bff93e56647c
+/deepseek-ai-dsh-llm-free-mode:
+  en: b97d8555ba650899
+  zh: 376019708833c1f6
+/deepseek-ai-dsh-llm-free-mode/summary:
+  en: 3ce4a00757f99ebc
+  zh: 8da77a51ffa0f266
+/deepseek-ai-dsh-llm-free-mode/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: f14f34fce35a8d90
+/deepseek-ai-dsh-llm-free-mode/use-this-package:
+  en: bbff250eba0f1b89
+  zh: 0a618f05cc88ee2b
+/deepseek-ai-dsh-llm-free-mode/use-this-package/enable-free-mode:
+  en: c8697dbb18858557
+  zh: 668d6769f87add45
+/deepseek-ai-dsh-llm-free-mode/use-this-package/what-you-can-observe:
+  en: 97a860ca005f5af5
+  zh: 0dc74ee41ddd858a
+/deepseek-ai-dsh-llm-free-mode/use-this-package/failures-and-recovery:
+  en: 8054c825ca584965
+  zh: e62daa52598b5fc3
+/deepseek-ai-dsh-llm-free-mode/understand-the-implementation:
+  en: db4375b6147c9d81
+  zh: 1043f051eaba9138
+/deepseek-ai-dsh-llm-free-mode/further-exploration:
+  en: ed4bdf26f20d3d93
+  zh: 7b8e31b19a842748
+/deepseek-ai-dsh-llm-free-mode/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-llm-free-mode/model-experience/free-mode-routing:
+  en: a80d3de3959e5c4b
+  zh: df322903e37b462e
+/deepseek-ai-dsh-llm-free-mode/model-experience/free-mode-routing/what-the-model-sees:
+  en: b020ff13bdb4bae6
+  zh: 89ac6ac583c0d344
+/deepseek-ai-dsh-llm-free-mode/model-experience/free-mode-routing/token-effect:
+  en: 57e110ec16a37587
+  zh: 4a76fcc1d40397ef
+/deepseek-ai-dsh-llm-free-mode/model-experience/free-mode-routing/kv-cache-effect:
+  en: 459e1c2c1bf36127
+  zh: 7c5927ee186e5f0c
+/deepseek-ai-dsh-llm-free-mode/known-limitations-and-deferred-work:
+  en: 9b7b8dbd7eb35c4b
+  zh: add80d675bb60e91
+/deepseek-ai-dsh-llm-free-mode/known-limitations-and-deferred-work/dev-note:
+  en: 7475c02dd79fc18f
+  zh: b4cec2affdb4aded

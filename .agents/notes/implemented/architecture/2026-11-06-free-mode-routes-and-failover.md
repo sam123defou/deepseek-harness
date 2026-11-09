@@ -10,11 +10,11 @@ A user who must not spend credit could only disable paid adapters by hand. That 
 
 ## Decision
 
-`dsh-llm-free-mode` holds an ordered allowlist in the `llm-free-mode` settings section. `dsh-base` mounts it dormant, following `llm-pi-ai`, because a user patch row that targets an absent entry only warns and the protection would be missing without an error.
+`dsh-llm-free-mode` holds an ordered allowlist in volatile fields of its own `llm-free-mode` entry Config, so live edits apply without a reload and the former `settings.yaml` section is imported into that entry once. `dsh-base` mounts it dormant, following `llm-pi-ai`, because a user patch row that targets an absent entry only warns and the protection would be missing without an error.
 
 The refusal runs in `LlmRuntime.prepareCall()` and `adapterStream()` through `registerRouteGuard()`, and in `WebRuntime.search()` through `registerSearchGuard()`. An `llm/stream` listener would not be enforcement, because another listener can end the chain first.
 
-The failover uses the existing `agent/request-error` waterfall and `{ kind: 'retry' }`, because `step()` re-runs `prepareRequest()` on each attempt. `agent-loop` does not change. The selection reference is private to each entry point, so the new `agent/model-reroute` event reaches it; a plain `agent/request` listener would leave the selection and the logged header disagreeing and produce a false model-change notice. The listener delegates first, which makes the result independent of registration order, since row order carries no load semantics.
+The failover uses the `agent/request-error` waterfall and its `{ kind: 'next-step' }` action. A step fixes its model selection before the first request, and `agent/request` refuses a provider or model change, so the failover records the next route with `agent.model.select()` and the loop continues the turn in a new step that snapshots the selection again. The durable `model/selection` event keeps the route change and the model-switch notice reconstructable from the log. Because each route change opens a new step, the `llmFailover` projection resets on `assistant/message` and `turn/end`, not on `step/start`; otherwise every new step would forget the routes already tried. The listener delegates first, which makes the result independent of registration order, since row order carries no load semantics.
 
 The daily limit is read from `GET /api/v1/key`, because the 429 body does not separate the minute limit from the day limit and pi-ai flattens response headers away.
 

@@ -1,6 +1,6 @@
 # Research: Mode gratuit fiable
 
-Sources : code du dépôt sur `b2e3b2a012`, config `~/.dsh` lue avec secrets masqués, et pages
+Sources : code du dépôt au point de départ de la branche (9 sept. 2026), config `~/.dsh` lue avec secrets masqués, et pages
 OpenRouter `api-reference/limits` et `api-reference/errors` lues le 2026-11-05.
 
 ## R1. Changer de modèle dans une étape

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { Context, Service } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
@@ -16,9 +16,10 @@ import type { GenerateOptions, LlmResolvedModelInfo, ResolvedRetryPolicy, Stream
 import * as retry from '@deepseek-ai/dsh-llm-retry'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import { generateSessionTitleWithLlm, resolveSessionTitleLlmConfig } from '@deepseek-ai/dsh-session-title-llm'
+import { executeSessionTitleLlm, resolveSessionTitleLlmConfig } from '@deepseek-ai/dsh-session-title-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import WebRuntime from '@deepseek-ai/dsh-web'
 import LlmFreeMode from '../src/index.ts'
 import type { FreeModeSettings } from '../src/index.ts'
@@ -32,26 +33,6 @@ const PAID = { provider: 'paid', model: 'premium' }
 const REFUSED = 'FREE_MODE_ROUTE_REFUSED'
 
 let section: Partial<FreeModeSettings> = { enabled: true, routes: LISTED }
-
-/** Minimal settings service: one in-memory user section over the composition entry. */
-class MemorySettings extends Service {
-  constructor(ctx: Context) {
-    super(ctx, 'settings')
-  }
-
-  installSection(
-    _owner: Context,
-    _ns: string,
-    schema: (value: unknown) => FreeModeSettings,
-    entry: FreeModeSettings,
-    hooks: { validate?: (value: FreeModeSettings) => void; setSource(source: () => FreeModeSettings): void; onChange(): void },
-  ): void {
-    const value = schema({ ...entry, ...section })
-    hooks.validate?.(value)
-    hooks.setSource(() => value)
-    hooks.onChange()
-  }
-}
 
 /** A provider with a usable paid key: every request reaching it is recorded, and listed models fail. */
 class PaidKeyAdapter extends LlmAdapter {
@@ -102,8 +83,8 @@ const MODULES = new Map<string, unknown>([
   ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
   ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
   ['@deepseek-ai/dsh-tools', ToolRuntime],
+  ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
   ['@deepseek-ai/dsh-agent', AgentRegistry],
-  ['@deepseek-ai/dsh-settings', MemorySettings],
   ['@deepseek-ai/dsh-web', WebRuntime],
   ['@deepseek-ai/dsh-agent-loop', AgentLoop],
   ['@deepseek-ai/dsh-llm-retry', retry],
@@ -113,7 +94,10 @@ const MODULES = new Map<string, unknown>([
 async function load(): Promise<{ loaded: Context; adapter: PaidKeyAdapter }> {
   root = await mkdtemp(join(tmpdir(), 'dsh-free-guarantee-'))
   const configPath = join(root, 'cordis.yml')
-  await writeFile(configPath, [...MODULES.keys()].map(name => `- name: '${name}'`).join('\n') + '\n')
+  const row = (name: string) => name === '@deepseek-ai/dsh-llm-free-mode'
+    ? `- name: '${name}'\n  config: ${JSON.stringify(section)}`
+    : `- name: '${name}'`
+  await writeFile(configPath, [...MODULES.keys()].map(row).join('\n') + '\n')
   const loaded = new Context()
   context = loaded
   loaded.baseUrl = pathToFileURL(root).href + '/'
@@ -184,15 +168,15 @@ describe('free-mode no-charge guarantee', () => {
     const { loaded, adapter } = await load()
     const agent = await agentOn(loaded, FIRST)
     const config = resolveSessionTitleLlmConfig({
-      ...PAID, targetWords: 5, targetCjkCharacters: 10, maxInputBytes: 1_000, maxOutputTokens: 16, timeoutMs: 5_000,
+      ...PAID, maxInputBytes: 1_000, maxOutputTokens: 16, timeoutMs: 5_000,
     })
 
-    await expect(generateSessionTitleWithLlm(
+    await expect(executeSessionTitleLlm(
       loaded,
       config,
       { session: agent.session, signal: new AbortController().signal } as never,
-      [{ seq: 1, text: 'go' }] as never,
       'free-guarantee' as never,
+      { system: 'title', input: 'go', messageSeqs: [1] as never, selectReasoningEffort: () => undefined },
     )).rejects.toMatchObject({ code: REFUSED })
     expect(adapter.requests).toEqual([])
   })

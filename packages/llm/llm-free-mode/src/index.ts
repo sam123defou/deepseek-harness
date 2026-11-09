@@ -1,29 +1,21 @@
 /**
- * Free mode: admits only listed free routes, moves a failed step to the next
- * listed route after request retries end, and reads the daily quota. The
- * plugin stays inert until `llm-free-mode.enabled` is true in settings.
+ * Free mode: admits only listed free routes, continues a failed step on the
+ * next listed route after request retries end, and reads the daily quota. The
+ * plugin stays inert until its volatile `enabled` Config field is true.
  * @module @deepseek-ai/dsh-llm-free-mode
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
-import type { Events } from '@deepseek-ai/cordis'
+import type { Events, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { RequestErrorAction } from '@deepseek-ai/dsh-agent'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { cancellableDelay } from '@deepseek-ai/dsh-timeout'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { PreparedLlmCall } from '@deepseek-ai/dsh-llm'
-import type {} from '@deepseek-ai/dsh-session-projection'
-import type {} from '@deepseek-ai/dsh-settings'
+import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import { WebError } from '@deepseek-ai/dsh-web'
-import {
-  checkRoute,
-  FREE_MODE_SETTINGS_NAMESPACE,
-  FreeModeSettingsSchema,
-  sameRoute,
-  validateFreeModeSettings,
-} from './config.ts'
+import { checkRoute, sameRoute, validateFreeModeSettings } from './config.ts'
 import type { FreeModeSettings, FreeRoute, RouteIssue } from './config.ts'
 import {
   applyFailoverEvent,
@@ -42,7 +34,6 @@ import type { FailureCause, FreeRouteKey, LlmFailoverEventData } from './types.t
 
 export type { FreeModeSettings, FreeRoute, RouteIssue, RouteProblem } from './config.ts'
 export { describeFailover, failoverStopMessage, ROUTE_REFUSED_CODE } from './failover.ts'
-export { FREE_MODE_SETTINGS_NAMESPACE } from './config.ts'
 export type { FreeModeQuota } from './quota.ts'
 export type { FailureCause, FreeRouteKey, LlmFailoverEventData } from './types.ts'
 
@@ -53,43 +44,49 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Composition entry of the plugin. */
+/** Composition entry of the plugin; every field is live-editable. */
 export interface Config {
-  /** `free-check` only: reports unusable routes instead of refusing requests for them. */
-  reportOnly?: boolean
+  /** `false` keeps `routes` and removes every guard and the failover. */
+  enabled: Volatile<boolean>
+  /** Routes in priority order. */
+  routes: Volatile<FreeRoute[]>
+  /** Wait before leaving a route after a rate limit, in milliseconds. */
+  rateLimitDelayMs: Volatile<number>
+  /** Longest duration of one failover chain, in milliseconds. */
+  maxFailoverMs: Volatile<number>
+  /** Largest accepted provider `streamIdleTimeoutMs`, in milliseconds. */
+  maxRouteIdleMs: Volatile<number>
+  /** Limit of each quota or catalog read, in milliseconds. */
+  networkTimeoutMs: Volatile<number>
 }
 
 /** Free-mode service; see the module documentation. */
 export class LlmFreeMode extends Service {
-  static inject = ['agents', 'llm', 'sessionProjections', 'settings']
+  static inject = ['agents', 'llm', 'sessionProjections']
 
-  static Config: z<Config> = z.object({
-    reportOnly: z.boolean().default(false),
+  static Config = z.object({
+    enabled: z.boolean().default(false).volatile(),
+    routes: z.array(z.object({
+      provider: z.string().required(),
+      model: z.string().required(),
+      freeTierConfirmed: z.boolean(),
+    })).default([]).volatile(),
+    rateLimitDelayMs: z.natural().default(5_000).volatile(),
+    maxFailoverMs: z.natural().default(55_000).volatile(),
+    maxRouteIdleMs: z.natural().default(20_000).volatile(),
+    networkTimeoutMs: z.natural().default(10_000).volatile(),
   })
 
-  // Assigned synchronously by `installSection`; `settings` is a required injection.
-  private source!: () => FreeModeSettings
-  private validated: FreeModeSettings | undefined
-  private readonly reportOnly: boolean
+  /** JSON of the settings whose routes last passed every check. */
+  private validated: string | undefined
   private readonly lifetime = new AbortController()
   private readonly active = new Set<Promise<RequestErrorAction>>()
+  private failover!: ProjectionHandle<FailoverState>
 
-  constructor(ctx: Context, config: Config) {
+  constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'freeMode')
-    const entry = FreeModeSettingsSchema({} as FreeModeSettings)
-    this.reportOnly = config.reportOnly === true
-    ctx.settings.installSection(ctx, FREE_MODE_SETTINGS_NAMESPACE, FreeModeSettingsSchema, entry, {
-      validate: validateFreeModeSettings,
-      setSource: (current) => { this.source = current },
-      onChange: () => { this.validated = undefined },
-    })
-    ctx.sessionProjections.register({
-      key: 'llmFailover',
-      stateVersion: 1,
-      stateSchema: failoverStateSchema,
-      init: initialFailoverState,
-      apply: applyFailoverEvent,
-    })
+    // Misconfiguration fails the load; a later live edit is checked on each read.
+    this.source()
     ctx.llm.registerRouteGuard(route => this.admit(route))
     ctx.inject(['web'], (webCtx) => {
       webCtx.web.registerSearchGuard((provider) => {
@@ -97,6 +94,17 @@ export class LlmFreeMode extends Service {
           throw new WebError(`free mode refused web search provider "${provider.id}": it may bill requests`, 'WEB_PROVIDER_REFUSED_FREE_MODE')
         }
       })
+    })
+  }
+
+  protected async [Service.init](): Promise<void> {
+    const ctx = this.ctx
+    this.failover = await ctx.sessionProjections.register({
+      key: 'llmFailover',
+      stateVersion: 2,
+      stateSchema: failoverStateSchema,
+      init: initialFailoverState,
+      apply: applyFailoverEvent,
     })
     const disposeListener = ctx.on('agent/request-error', (payload, next: () => Promise<RequestErrorAction>) => {
       return this.track(this.recover(payload, next))
@@ -114,6 +122,20 @@ export class LlmFreeMode extends Service {
    */
   currentSettings(): FreeModeSettings {
     return this.source()
+  }
+
+  private source(): FreeModeSettings {
+    const { config } = this
+    const settings: FreeModeSettings = {
+      enabled: config.enabled.get(),
+      routes: config.routes.get(),
+      rateLimitDelayMs: config.rateLimitDelayMs.get(),
+      maxFailoverMs: config.maxFailoverMs.get(),
+      maxRouteIdleMs: config.maxRouteIdleMs.get(),
+      networkTimeoutMs: config.networkTimeoutMs.get(),
+    }
+    validateFreeModeSettings(settings)
+    return settings
   }
 
   /**
@@ -166,10 +188,11 @@ export class LlmFreeMode extends Service {
         ROUTE_REFUSED_CODE,
       )
     }
-    if (this.reportOnly || this.validated === settings) return
+    const key = JSON.stringify(settings)
+    if (this.validated === key) return
     const [first] = await this.checkRoutes()
     if (first !== undefined) throw new LlmError(first.message, first.code)
-    this.validated = settings
+    this.validated = key
   }
 
   private track(operation: Promise<RequestErrorAction>): Promise<RequestErrorAction> {
@@ -221,13 +244,13 @@ export class LlmFreeMode extends Service {
     const delegated = await next()
     const settings = this.source()
     const fused = AbortSignal.any([signal, this.lifetime.signal])
-    if (delegated?.kind === 'retry' || fused.aborted || !settings.enabled) return delegated
+    if (delegated !== undefined || fused.aborted || !settings.enabled) return delegated
     if (failure.code === ROUTE_REFUSED_CODE) return delegated
     // oxlint-disable-next-line typescript/no-non-null-assertion -- a failed request logged its header first
     const { provider, model } = agent.session.requestHeader()!.config
     const from: FreeRouteKey = { provider, model }
     const cause = await this.causeOf(failure.code, from.provider, fused)
-    const state = this.ctx.sessionProjections.stateOf(agent.session, 'llmFailover') as FailoverState
+    const state = this.failover.stateOf(agent.session)
     const route = failoverExhausted(cause, state, Date.now(), settings.maxFailoverMs)
       ? undefined
       : await this.nextRoute(failoverCandidates(settings.routes, from, cause, state), from, cause, fused)
@@ -238,14 +261,10 @@ export class LlmFreeMode extends Service {
       return undefined
     }
     const to: FreeRouteKey = { provider: route.provider, model: route.model }
-    const applied = await agentEvents(this.ctx, agent).serial('agent/model-reroute', { route: to })
-    if (applied !== true) {
-      agent.session.append('llm/failover', record)
-      return undefined
-    }
     const delayMs = cause === 'rate-limited' ? settings.rateLimitDelayMs : 0
     agent.session.append('llm/failover', { ...record, to, delayMs })
-    return await cancellableDelay(delayMs, fused) ? { kind: 'retry' } : undefined
+    agent.model.select(to)
+    return await cancellableDelay(delayMs, fused) ? { kind: 'next-step' } : undefined
   }
 }
 

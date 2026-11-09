@@ -72,10 +72,11 @@ describe('applyFailoverEvent()', () => {
     expect(applyFailoverEvent(initialFailoverState(), failover('invalid-request')).invalidRequestSwitched).toBe(true)
   })
 
-  it('resets at each step and turn end, and ignores other events', () => {
+  it('resets at an assistant reply and turn end, and keeps the chain across steps', () => {
     const state = applyFailoverEvent(initialFailoverState(), failover('saturated'))
     expect(applyFailoverEvent(state, { type: 'request/header' } as SessionEvent)).toBe(state)
-    expect(applyFailoverEvent(state, { type: 'step/start' } as SessionEvent)).toEqual(initialFailoverState())
+    expect(applyFailoverEvent(state, { type: 'step/start' } as SessionEvent)).toBe(state)
+    expect(applyFailoverEvent(state, { type: 'assistant/message' } as SessionEvent)).toEqual(initialFailoverState())
     expect(applyFailoverEvent(state, { type: 'turn/end' } as SessionEvent)).toEqual(initialFailoverState())
   })
 })

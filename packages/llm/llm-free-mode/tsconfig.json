@@ -16,7 +16,6 @@
     { "path": "../../core/agent" },
     { "path": "../../credentials/credentials" },
     { "path": "../../session/session-projection" },
-    { "path": "../../settings/settings" },
     { "path": "../../util/timeout" },
     { "path": "../../web/web" }
   ]

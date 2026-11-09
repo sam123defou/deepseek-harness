@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-11-06-free-mode-routes-and-failover.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-06-free-mode-routes-and-failover.md
-2026-11-06-free-mode-routes-and-failover.md: 494f7987e99e2f8ffcd7b968f5abfa6cd52197b4
-2026-11-06-free-mode-routes-and-failover.zh.md: 5deb53491e66fedb269b849de7a9482728c5fc82
+/agent-note-free-mode-routes-and-failover:
+  en: a3a155181a785a1c
+  zh: 31fd1506be1ac913
+/agent-note-free-mode-routes-and-failover/problem:
+  en: 079f8f379d958bda
+  zh: bd13c485d73cd93a
+/agent-note-free-mode-routes-and-failover/decision:
+  en: 80ea51d15d755a1e
+  zh: 1ca705a40891899f
+/agent-note-free-mode-routes-and-failover/alternatives-considered:
+  en: f5df6fcc6e0a0b9d
+  zh: 4bfd299fd0a69ca9
+/agent-note-free-mode-routes-and-failover/consequences:
+  en: 2b6dfa74bddc2775
+  zh: 37487e169d65190d

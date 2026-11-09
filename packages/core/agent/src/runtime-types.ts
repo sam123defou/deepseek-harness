@@ -12,25 +12,30 @@ import type {
 } from '@deepseek-ai/dsh-llm'
 import type { AgentCancelCause, Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
 export type { AgentCancelCause } from '@deepseek-ai/dsh-session'
-import type { ModelSelection } from './model-selection.ts'
-import type { Agent, InboxTarget } from './types.ts'
+import type { Agent, InboxTarget, ModelSelection } from './types.ts'
 export type { Agent } from './types.ts'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 declare module '@deepseek-ai/dsh-system-prompt' {
   interface AssembleContext {
     /** Agent for this assembly; absent on diagnostics. When present, `scope` must identify the same agent. */
     agent?: Agent
+    /** Captured step selection, retained across retries; omitted effort uses adapter defaults. Absent outside agent steps. */
+    modelSelection?: Readonly<ModelSelection>
   }
 }
 
-/** Merge-extensible agent creation options. Persona belongs to system-prompt sections. */
+/**
+ * Merge-extensible agent options. Route fields may be live accessors until the
+ * Session records a selection or request; step preparation captures their value.
+ * Persona belongs to system-prompt sections.
+ */
 export interface AgentOptions {
   /** Provider route (must have a registered adapter at call time). */
   provider?: string
   /** Model id interpreted by the selected provider adapter. */
   model?: string
   /** Adapter-owned reasoning effort for the selected provider/model route. */
-  reasoningEffort?: ReasoningEffortId
+  reasoningEffort?: ReasoningEffortId | undefined
   /** Maximum output tokens for each conversation-model request. */
   maxTokens?: number
 }
@@ -43,6 +48,27 @@ export interface CancelOptions {
    * later turn and no canceled inbox splice is logged.
    */
   keepInbox?: boolean | undefined
+}
+
+/** Agent-owned access to the model choice for future steps. */
+export interface Model {
+  /**
+   * Resolve the choice for the next step to begin preparation. Recorded choices
+   * take precedence over the last request and then the Agent's live options.
+   * This read neither starts a step nor changes an already-prepared step.
+   * @returns a detached choice, or undefined when no source names both provider and model.
+   */
+  current(): Readonly<ModelSelection> | undefined
+
+  /**
+   * Replace the next step's complete selection. Omitted effort follows adapter
+   * defaults without inheriting a previous effort or resolving defaults here.
+   * An equal recorded choice is a no-op; an options-only fallback is
+   * always recorded. Callers own model availability and capability validation.
+   * The append uses the Session's existing persistence and failure guarantees.
+   * @param selection - complete provider, model, and optional explicit effort.
+   */
+  select(selection: Readonly<ModelSelection>): void
 }
 
 /** Agent-owned access to pending work; concrete storage belongs to the driver. */
@@ -119,8 +145,14 @@ export type PreStepDecision =
     startsRequestSeries?: true
   }
 
-/** Action returned by a listener that owns model-request recovery. */
-export type RequestErrorAction = { kind: 'retry' } | undefined
+/**
+ * Action returned by a listener that owns model-request recovery. `retry`
+ * repeats the request inside the current step with the step's fixed model
+ * selection. `next-step` closes the current step without an assistant message
+ * and opens the next step of the same turn, which reads `agent.model` again; a
+ * listener records the new selection with `agent.model.select()` first.
+ */
+export type RequestErrorAction = { kind: 'retry' } | { kind: 'next-step' } | undefined
 
 /** Why a session lifecycle began; seeded creates are `startup`, while persisted loads are `resume`. */
 export type SessionStartSource = 'startup' | 'resume' | 'clear' | 'compact'
@@ -163,10 +195,12 @@ export type AssistantStreamFrame =
 
 declare module './types.ts' {
   interface Agent {
-    /** The provider route and model this agent's requests use. */
+    /** Route fallback and output controls; live accessors apply until the Session records a selection or request. */
     readonly options: AgentOptions
     /** The live session this agent drives; its log is the durable source of truth. */
     readonly session: Session
+    /** Agent-owned access to durable model selection for future steps. */
+    readonly model: Model
     /** Agent-owned access to durable pending work. */
     readonly inbox: Inbox
     /** The current lifecycle state, mirrored on every `agent/status` transition. */
@@ -208,7 +242,7 @@ declare module './types.ts' {
    * turn and runs when the aborted activity converges to idle; a `disposed`
    * cancel leaves it parked. A wake submitted while already idle always opens
    * its turn boundary, even when its message is cleared before the driver
-   * claims ([cancel-convergence wake latch](../../../../.agents/notes/implemented/bug-fix/2026-08-07-cancel-convergence-wake-latch.md)).
+   * claims ([driver wake convergence](../../agent-loop/src/agent.ts)).
    * @param message - identified content and the source that supplied it.
    * @param target - the preferred next-turn or next-step inbox boundary.
    * @param wakeup - whether delivery may wake the driver.
@@ -245,18 +279,21 @@ declare module './types.ts' {
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
-    // ---- lifecycle (emit) ----
+    // ---- lifecycle ----
     /**
-     * A fully configured agent and live session were published. Setup is
-     * composition-only; `agent/session-start` is the first startup-driving extension point.
-     * Synchronous listener failure vetoes publication, while returned-promise
-     * rejection is reported. Detach requested during dispatch waits until every
-     * creation listener has observed the stable entry.
+     * An entered agent is ready for per-agent initialization after factory setup.
+     * Listeners run in order and are awaited before creation resolves. AgentLoop
+     * holds queued input until all listeners finish. A throw or rejection fails
+     * creation and skips later listeners. Disposal retains the scope and session
+     * until dispatch settles; listeners must not await agent.whenIdle() or their
+     * own owner's disposal.
      * @param payload.agent - the newly registered agent with its live session and completed setup.
+     * @param payload.source - fresh creation, resume, clear, or compaction source.
+     * @param payload.signal - factory initialization cancellation signal, when provided.
      * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
-     * @mode emit
+     * @mode serial
      */
-    'agent/created'(this: Scoped<Agent>, payload: { agent: Agent }): void
+    'agent/created'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource; signal?: AbortSignal }): undefined | Promise<undefined>
     /**
      * An agent left the registry; AgentLoop emits this after driver quiescence
      * and scoped-registration unwind, but before session detachment. Custom
@@ -303,19 +340,6 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'agent/inbox/discarded'(this: Scoped<Agent>, payload: { agent: Agent; message: UserMessage }): void
-    // ---- session lifecycle (emit) ----
-    /**
-     * The session lifecycle began, once before the first turn. Use
-     * `agent.inject()` to seed model-facing context. This is a notification, not
-     * a veto; disposal requested by a lifecycle owner is rechecked before the
-     * driver starts.
-     * @param payload.agent - the agent whose session lifecycle began.
-     * @param payload.source - why the session started (fresh startup, resume, …).
-     * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
-     * @mode emit
-     */
-    'agent/session-start'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource }): void
-
     // ---- the machine's extension points ----
     /**
      * Reject a proposed step or replace the messages that enter it. Calling
@@ -325,19 +349,26 @@ declare module '@deepseek-ai/cordis' {
      * @param payload.turn - the turn that will own the step.
      * @param payload.step - the step proposed by the loop.
      * @param payload.signal - the current turn's cancellation signal.
+     * @param payload.modelSelection - captured step selection, retained across retries; omitted effort uses adapter defaults.
      * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
      * @mode waterfall
      */
-    'agent/pre-step'(this: Scoped<Agent>, payload: { agent: Agent; messages: UserMessage[]; turn: number; step: number; signal: AbortSignal }, next: () => Promise<PreStepDecision>): Promise<PreStepDecision>
+    'agent/pre-step'(this: Scoped<Agent>, payload: { agent: Agent; messages: UserMessage[]; turn: number; step: number; signal: AbortSignal; modelSelection: Readonly<ModelSelection> }, next: () => Promise<PreStepDecision>): Promise<PreStepDecision>
     /**
      * Replace the frozen call configuration. `await next()` yields the config
-     * the machine would use (agent options on the first request, the logged
-     * header afterwards); return a replacement to switch. On step admission,
+     * the machine would use (the step's model selection with agent options on
+     * the first request, the logged header's controls afterwards); a
+     * replacement may adjust controls but must keep the provider, model, and
+     * reasoning effort selection. On step admission,
      * this runs after assembly and `step/start`, before the system prompt and
      * accepted user batch are committed. Cancellation here or during subsequent
      * `prepareCall()` resolution commits neither. The prepared call capability
      * governs prompt admission. Model-visible content must use logged channels;
      * this waterfall cannot mutate messages.
+     * @deprecated Retained for existing listeners; do not add new listeners.
+     * Use agent.model.select() before step preparation for model and reasoning
+     * choices, and AgentOptions.maxTokens for the output cap. Other per-request
+     * control overrides have no replacement API.
      * @param payload.agent - the agent making the model call.
      * @param payload.turn - the open turn number.
      * @param payload.step - the step whose request this is.
@@ -348,8 +379,9 @@ declare module '@deepseek-ai/cordis' {
     'agent/request'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>
     /**
      * Handle one failed model-request attempt before the loop retries or closes
-     * its step. A listener returns `{ kind: 'retry' }` without calling `next()`
-     * when it owns recovery, or calls `next()` to delegate. The default
+     * its step. A listener returns `{ kind: 'retry' }` or `{ kind: 'next-step' }`
+     * without calling `next()` when it owns recovery, or calls `next()` to
+     * delegate. The default
      * `undefined` leaves the failure terminal.
      * @param payload.agent - the agent whose request failed.
      * @param payload.turn - the turn containing the failed request.
@@ -362,17 +394,6 @@ declare module '@deepseek-ai/cordis' {
      * @mode waterfall
      */
     'agent/request-error'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; provider: string; failure: LlmFailure; retryPolicy: ResolvedRetryPolicy | undefined; signal: AbortSignal }, next: () => Promise<RequestErrorAction>): Promise<RequestErrorAction>
-    /**
-     * Replace the route selected for the current step and the following steps.
-     * A listener that owns the Agent's model selection returns `true` after both
-     * apply; an Agent without an installed selection leaves the result undefined.
-     * @param payload.agent - the agent whose selection changes.
-     * @param payload.route - the provider and model to use from the next request attempt.
-     * @returns `true` when the route was applied.
-     * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
-     * @mode serial
-     */
-    'agent/model-reroute'(this: Scoped<Agent>, payload: { agent: Agent; route: ModelSelection }): true | undefined
     /**
      * Process-local assistant-stream publication. Chunk frames are transient;
      * the loop appends one final v2 `assistant/message` or `assistant/attempt`

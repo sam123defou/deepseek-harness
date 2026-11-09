@@ -1,5 +1,6 @@
 /**
- * Failover decisions and the durable per-step state they read.
+ * Failover decisions and the durable state of the current failover chain: the
+ * consecutive failed requests since the last assistant reply of the turn.
  * @module @deepseek-ai/dsh-llm-free-mode/failover
  */
 
@@ -12,13 +13,13 @@ import type { FailureCause, FreeRouteKey, LlmFailoverEventData } from './types.t
 /** Code a route guard raises; it ends the request and never reaches another route. */
 export const ROUTE_REFUSED_CODE = 'FREE_MODE_ROUTE_REFUSED'
 
-/** Failover facts of the current step. */
+/** Failover facts of the current chain. */
 export interface FailoverState {
-  /** Routes left in this step. */
+  /** Routes left in this chain. */
   tried: FreeRouteKey[]
-  /** Time of the first failover of this step, in epoch milliseconds. */
+  /** Time of the first failover of this chain, in epoch milliseconds. */
   startedAt?: number
-  /** Providers abandoned in this step for quota or credential reasons. */
+  /** Providers abandoned in this chain for quota or credential reasons. */
   excludedProviders: string[]
   /** The single route change allowed for an invalid request has happened. */
   invalidRequestSwitched: boolean
@@ -26,7 +27,7 @@ export interface FailoverState {
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
-    /** Failover state of the current step. */
+    /** Failover state of the current chain. */
     llmFailover: FailoverState
   }
 }
@@ -111,7 +112,8 @@ function assertNever(value: never): never {
  * @returns the original or advanced state.
  */
 export function applyFailoverEvent(state: FailoverState, event: SessionEvent): FailoverState {
-  if (event.type === 'step/start' || event.type === 'turn/end') return initialFailoverState()
+  // A failover opens a new step, so only a reply or the turn's end closes the chain.
+  if (event.type === 'assistant/message' || event.type === 'turn/end') return initialFailoverState()
   if (event.type !== 'llm/failover') return state
   const data: LlmFailoverEventData = event.data
   return {
@@ -127,7 +129,7 @@ export function applyFailoverEvent(state: FailoverState, event: SessionEvent): F
 /**
  * Tell whether the failover must stop before looking at routes.
  * @param cause - cause of the failure.
- * @param state - failover state of the step.
+ * @param state - failover state of the chain.
  * @param now - current time in epoch milliseconds.
  * @param maxFailoverMs - longest failover duration.
  * @returns true when no further route may be tried.
@@ -147,7 +149,7 @@ export function failoverExhausted(
  * @param routes - configured list.
  * @param failed - route of the failed request.
  * @param cause - cause of the failure.
- * @param state - failover state of the step.
+ * @param state - failover state of the chain.
  * @returns the candidates.
  */
 export function failoverCandidates(

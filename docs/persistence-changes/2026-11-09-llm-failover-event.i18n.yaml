@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-11-09-llm-failover-event.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-09-llm-failover-event.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-11-09-llm-failover-event:
+  en: dbe7d9fc7ebecb6b
+  zh: 027ff35c2b421334
+/2026-11-09-llm-failover-event/summary:
+  en: 6eb08b292f6ee7ec
+  zh: 44e1e671a474ad22
+/2026-11-09-llm-failover-event/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-11-09-llm-failover-event/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-11-09-llm-failover-event/compatibility:
+  en: c324101dd691eaa3
+  zh: d5e1a4fad6f0b88e
+/2026-11-09-llm-failover-event/verification:
+  en: 0d9594bdc89ec28d
+  zh: 7d33b21538dfd52c
+/2026-11-09-llm-failover-event/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

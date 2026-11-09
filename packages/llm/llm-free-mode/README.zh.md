@@ -27,32 +27,34 @@ kind: "package-reference"
 
 ### 启用免费模式
 
-在 `settings.yaml` 中加入一段。列出的每个提供方还必须在 `llm-pi-ai` 下保持有界重试和较短的流超时：
+在 home patch（`$DSH_HOME/cordis.patch.yml`，所有 profile 都会应用，包括 `free-check`）中设置 `llm-free-mode` 条目的 Config。列出的每个提供方还必须在 `llm-pi-ai` 条目中保持有界重试和较短的流超时：
 
 ```yaml
-llm-free-mode:
-  enabled: true
-  rateLimitDelayMs: 5000
-  maxFailoverMs: 55000
-  maxRouteIdleMs: 20000
-  networkTimeoutMs: 10000
-  routes:
-    - provider: openrouter
-      model: google/gemma-4-31b-it:free
-    - provider: groq
-      model: llama-3.3-70b-versatile
-      freeTierConfirmed: true
+- id: llm-free-mode
+  config:
+    enabled: true
+    rateLimitDelayMs: 5000
+    maxFailoverMs: 55000
+    maxRouteIdleMs: 20000
+    networkTimeoutMs: 10000
+    routes:
+      - provider: openrouter
+        model: google/gemma-4-31b-it:free
+      - provider: groq
+        model: llama-3.3-70b-versatile
+        freeTierConfirmed: true
 
-llm-pi-ai:
-  providers:
-    openrouter:
-      streamIdleTimeoutMs: 20000
-      retryPolicy:
-        mode: normal
-        maxRetries: 1
+- id: llm-pi-ai
+  config:
+    providers:
+      openrouter:
+        streamIdleTimeoutMs: 20000
+        retryPolicy:
+          mode: normal
+          maxRetries: 1
 ```
 
-OpenRouter 路由必须以 `:free` 结尾或等于 `openrouter/free`。其他提供方需要 `freeTierConfirmed: true`，因为只有账户所有者能确认它不会计费。`enabled: false` 移除守卫和故障切换，并保留 `routes`。
+OpenRouter 路由必须以 `:free` 结尾或等于 `openrouter/free`。其他提供方需要 `freeTierConfirmed: true`，因为只有账户所有者能确认它不会计费。`enabled: false` 移除守卫和故障切换，并保留 `routes`。所有字段都是 volatile 字段，因此修改后无需重新加载即可生效；`settings.yaml` 中原有的 `llm-free-mode:` 段会被一次性导入该条目。
 
 ### 可以观察到什么
 
@@ -67,7 +69,7 @@ OpenRouter 路由必须以 `:free` 结尾或等于 `openrouter/free`。其他提
 | `saturated` | `SERVER`、`TIMEOUT`、`TRANSPORT`、`EMPTY_RESPONSE` | 下一条路由 |
 | `rate-limited` | `RATE_LIMIT`，且配额有剩余或未知 | 等待 `rateLimitDelayMs` 后切到下一条路由 |
 | `unavailable` | `PI_AI_ERROR` | 下一条路由 |
-| `invalid-request` | `INVALID_REQUEST` | 每步只切换一次路由，然后停止 |
+| `invalid-request` | `INVALID_REQUEST` | 每条故障切换链只切换一次路由，然后停止 |
 | `quota-exhausted` | `QUOTA`，或读取到的配额为零 | 离开该提供方，否则停止 |
 | `credential-missing` | `MISSING_CREDENTIAL`、`INVALID_CREDENTIAL` | 离开该提供方，否则停止 |
 | `auth-refused` | `AUTH` | 离开该提供方，否则停止 |
@@ -82,7 +84,7 @@ OpenRouter 路由必须以 `:free` 结尾或等于 `openrouter/free`。其他提
 <details>
 <summary>实现内部细节 — 点击展开</summary>
 
-路由守卫位于 `LlmRuntime`，而不是 `llm/stream` 监听器，因为其他监听器可能先结束这条链。故障切换监听 `agent/request-error` 并先委托下游，因此无论注册顺序如何，`dsh-llm-retry` 都会用完它的预算。随后它发出 `agent/model-reroute`，由 Agent 的模型选择应用到运行中的步骤，并返回 `{ kind: 'retry' }`。循环重新运行 `prepareRequest()` 并记录新的 `request/header`。
+路由守卫位于 `LlmRuntime`，而不是 `llm/stream` 监听器，因为其他监听器可能先结束这条链。故障切换监听 `agent/request-error` 并先委托下游，因此无论注册顺序如何，`dsh-llm-retry` 都会用完它的预算。随后它通过 `agent.model.select()` 记录下一条路由（追加 `model/selection`），并返回 `{ kind: 'next-step' }`。循环关闭失败的步骤，并在新路由上打开同一轮次的下一步；该步骤带有模型切换提示，并记录新的 `request/header`。
 
 | 文件 | 职责 |
 |---|---|

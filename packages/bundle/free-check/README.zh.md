@@ -30,9 +30,9 @@ dsh --profile free-check --json
 
 每条路由最终处于一种状态：`ok`、`unknown`、`model-withdrawn`、`model-now-paid`、`credential-missing`、`model-not-configured`、`provider-unknown`、`unbounded-retry` 或 `timeout-too-long`。无法读取目录的提供方保持 `unknown`，绝不显示为 `ok`。
 
-免费模式就绪或已禁用时命令以 `0` 退出，没有可用路由或有路由变为付费时以 `1` 退出，诊断本身失败时以 `2` 退出。未通过校验的设置段会在启动时以带标签的错误停止该 profile。
+免费模式就绪或已禁用时命令以 `0` 退出，没有可用路由或有路由变为付费时以 `1` 退出，诊断本身失败时以 `2` 退出。未通过校验的免费模式 Config 会在启动时以带标签的错误停止该 profile。
 
-该 bundle 在 `llm-free-mode` 上设置 `reportOnly: true`，因此缺失的凭据会被报告，而不会中止命令。
+诊断不发送模型请求，因此缺失的凭据会被报告，而不会中止命令。home patch 中的免费模式设置同样作用于该 profile。
 
 -----
 

@@ -15,9 +15,9 @@ afterEach(async () => {
   home = undefined
 })
 
-async function freeCheck(settings: string) {
+async function freeCheck(homePatch: string) {
   home = await mkdtemp(join(tmpdir(), 'dsh-free-check-'))
-  await writeFile(join(home, 'settings.yaml'), settings)
+  await writeFile(join(home, 'cordis.patch.yml'), homePatch)
   return execa('node', ['--import', 'tsx/esm', binScript, '--profile', 'free-check', '--json'], {
     cwd: repoRoot,
     env: { DSH_HOME: home, OPENROUTER_API_KEY: '' },
@@ -27,25 +27,27 @@ async function freeCheck(settings: string) {
 
 describe('dsh --profile free-check', () => {
   it('reports disabled free mode on an empty home', { timeout: 120_000 }, async () => {
-    const result = await freeCheck('{}\n')
+    const result = await freeCheck('[]\n')
     expect(result.exitCode).toBe(0)
     expect(JSON.parse(result.stdout)).toMatchObject({ enabled: false, ready: false, routes: [] })
   })
 
   it('reports a missing credential instead of failing to start', { timeout: 120_000 }, async () => {
     const result = await freeCheck([
-      'llm-pi-ai:',
-      '  providers:',
-      '    openrouter:',
-      '      apiKeyEnv: OPENROUTER_API_KEY',
-      '      streamIdleTimeoutMs: 20000',
-      '      models:',
-      '        - id: google/gemma-4-31b-it:free',
-      'llm-free-mode:',
-      '  enabled: true',
-      '  routes:',
-      '    - provider: openrouter',
-      '      model: google/gemma-4-31b-it:free',
+      '- id: llm-pi-ai',
+      '  config:',
+      '    providers:',
+      '      openrouter:',
+      '        apiKeyEnv: OPENROUTER_API_KEY',
+      '        streamIdleTimeoutMs: 20000',
+      '        models:',
+      '          - id: google/gemma-4-31b-it:free',
+      '- id: llm-free-mode',
+      '  config:',
+      '    enabled: true',
+      '    routes:',
+      '      - provider: openrouter',
+      '        model: google/gemma-4-31b-it:free',
       '',
     ].join('\n'))
     expect(result.exitCode).toBe(1)

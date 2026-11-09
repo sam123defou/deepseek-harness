@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { FreeModeSettingsSchema, validateFreeModeSettings } from '../src/config.ts'
+import { validateFreeModeSettings } from '../src/config.ts'
 import type { FreeModeSettings, FreeRoute } from '../src/config.ts'
 
 function settings(routes: FreeRoute[], enabled = true): FreeModeSettings {
-  return FreeModeSettingsSchema({ enabled, routes } as FreeModeSettings)
+  return { enabled, routes, rateLimitDelayMs: 5_000, maxFailoverMs: 55_000, maxRouteIdleMs: 20_000, networkTimeoutMs: 10_000 }
 }
 
 function codeOf(value: FreeModeSettings): unknown {
@@ -40,10 +40,5 @@ describe('validateFreeModeSettings()', () => {
     const disabled = settings([{ provider: 'openrouter', model: 'paid' }], false)
     expect(codeOf(disabled)).toBeUndefined()
     expect(disabled.routes).toHaveLength(1)
-  })
-
-  it('refuses reportOnly inside the settings section', () => {
-    const value = { ...settings([{ provider: 'openrouter', model: 'a:free' }]), reportOnly: true }
-    expect(codeOf(value)).toBe('INVALID_CONFIG')
   })
 })

@@ -27,32 +27,34 @@ English | [中文](README.zh.md)
 
 ### Enable free mode
 
-Add one section to `settings.yaml`. Each listed provider must also keep bounded retries and a short stream timeout under `llm-pi-ai`:
+Set the `llm-free-mode` entry's Config in the home patch, `$DSH_HOME/cordis.patch.yml`, which every profile applies, including `free-check`. Each listed provider must also keep bounded retries and a short stream timeout in the `llm-pi-ai` entry:
 
 ```yaml
-llm-free-mode:
-  enabled: true
-  rateLimitDelayMs: 5000
-  maxFailoverMs: 55000
-  maxRouteIdleMs: 20000
-  networkTimeoutMs: 10000
-  routes:
-    - provider: openrouter
-      model: google/gemma-4-31b-it:free
-    - provider: groq
-      model: llama-3.3-70b-versatile
-      freeTierConfirmed: true
+- id: llm-free-mode
+  config:
+    enabled: true
+    rateLimitDelayMs: 5000
+    maxFailoverMs: 55000
+    maxRouteIdleMs: 20000
+    networkTimeoutMs: 10000
+    routes:
+      - provider: openrouter
+        model: google/gemma-4-31b-it:free
+      - provider: groq
+        model: llama-3.3-70b-versatile
+        freeTierConfirmed: true
 
-llm-pi-ai:
-  providers:
-    openrouter:
-      streamIdleTimeoutMs: 20000
-      retryPolicy:
-        mode: normal
-        maxRetries: 1
+- id: llm-pi-ai
+  config:
+    providers:
+      openrouter:
+        streamIdleTimeoutMs: 20000
+        retryPolicy:
+          mode: normal
+          maxRetries: 1
 ```
 
-An OpenRouter route must end in `:free` or be `openrouter/free`. Any other provider needs `freeTierConfirmed: true`, because only the account owner can confirm that it does not bill. `enabled: false` removes the guards and the failover and keeps `routes`.
+An OpenRouter route must end in `:free` or be `openrouter/free`. Any other provider needs `freeTierConfirmed: true`, because only the account owner can confirm that it does not bill. `enabled: false` removes the guards and the failover and keeps `routes`. Every field is volatile, so an edit applies without a reload, and a former `llm-free-mode:` section of `settings.yaml` is imported into this entry once.
 
 ### What you can observe
 
@@ -67,7 +69,7 @@ A section that fails validation rejects registration at startup, and a later inv
 | `saturated` | `SERVER`, `TIMEOUT`, `TRANSPORT`, `EMPTY_RESPONSE` | Next route |
 | `rate-limited` | `RATE_LIMIT` with quota left or unknown | Next route after `rateLimitDelayMs` |
 | `unavailable` | `PI_AI_ERROR` | Next route |
-| `invalid-request` | `INVALID_REQUEST` | One route change per step, then stop |
+| `invalid-request` | `INVALID_REQUEST` | One route change per failover chain, then stop |
 | `quota-exhausted` | `QUOTA`, or a quota read of zero | Leave the provider, otherwise stop |
 | `credential-missing` | `MISSING_CREDENTIAL`, `INVALID_CREDENTIAL` | Leave the provider, otherwise stop |
 | `auth-refused` | `AUTH` | Leave the provider, otherwise stop |
@@ -82,7 +84,7 @@ A section that fails validation rejects registration at startup, and a later inv
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The route guard lives in `LlmRuntime`, not in an `llm/stream` listener, because another listener can end that chain first. The failover listens to `agent/request-error` and delegates first, so `dsh-llm-retry` finishes its budget whatever the registration order. It then emits `agent/model-reroute`, which the Agent's model selection applies to the running step, and returns `{ kind: 'retry' }`. The loop re-runs `prepareRequest()` and logs the new `request/header`.
+The route guard lives in `LlmRuntime`, not in an `llm/stream` listener, because another listener can end that chain first. The failover listens to `agent/request-error` and delegates first, so `dsh-llm-retry` finishes its budget whatever the registration order. It then records the next route with `agent.model.select()`, which appends `model/selection`, and returns `{ kind: 'next-step' }`. The loop closes the failed step and opens the next step of the same turn on the new route; that step carries the model-switch notice and logs the new `request/header`.
 
 | File | Role |
 |---|---|

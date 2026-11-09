@@ -30,9 +30,9 @@ dsh --profile free-check --json
 
 Each route ends in one state: `ok`, `unknown`, `model-withdrawn`, `model-now-paid`, `credential-missing`, `model-not-configured`, `provider-unknown`, `unbounded-retry`, or `timeout-too-long`. A provider without a readable catalog stays `unknown`, never `ok`.
 
-The command exits `0` when free mode is ready or disabled, `1` when no route is usable or a route became paid, and `2` when the diagnostic itself fails. A section that fails validation stops the profile at startup with a labelled error.
+The command exits `0` when free mode is ready or disabled, `1` when no route is usable or a route became paid, and `2` when the diagnostic itself fails. A free-mode Config that fails validation stops the profile at startup with a labelled error.
 
-The bundle sets `reportOnly: true` on `llm-free-mode`, so a missing credential is reported instead of stopping the command.
+The diagnostic sends no model request, so a missing credential is reported instead of stopping the command. Free-mode settings in the home patch apply to this profile too.
 
 -----
 

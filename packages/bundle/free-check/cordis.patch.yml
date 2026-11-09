@@ -1,10 +1,4 @@
 # The dsh-free-check bundle patch: the free-mode diagnostic over dsh-base.
-# `reportOnly` turns an unusable route into a reported state, so a missing
-# credential does not stop the command that must report it.
-
-- id: llm-free-mode
-  config:
-    reportOnly: true
 
 - insert:
     - id: free-check

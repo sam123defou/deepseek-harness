@@ -1,3 +1,4 @@
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
@@ -17,6 +18,7 @@ async function harness(adapter: MockAdapter): Promise<Context> {
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['mock'], adapter)
@@ -100,6 +102,26 @@ describe('agent/request-error', () => {
     expect(statuses).toEqual(['running', 'idle'])
     expect(agent.session.snapshotEvents().flatMap(event =>
       event.type === 'request/header' ? [event.data.reason] : [])).toEqual(['initial'])
+  })
+
+  it('continues the turn in a new step on the model a next-step action selects', async () => {
+    const adapter = new MockAdapter([fail('overloaded', 'SERVER'), textResponse('ok')])
+    const ctx = await harness(adapter)
+    const agent = await ctx.agentLoop.create(SessionId('request-error-next-step'), { provider: 'mock', model: 'mock' })
+    ctx.on('agent/request-error', async ({ agent: subject }) => {
+      subject.model.select({ provider: 'mock', model: 'other' })
+      return { kind: 'next-step' }
+    })
+
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await agent.whenIdle()
+
+    const events = agent.session.snapshotEvents()
+    expect(adapter.requests.map(request => request.model)).toEqual(['mock', 'other'])
+    expect(events.filter(event => event.type === 'turn/start')).toHaveLength(1)
+    expect(events.flatMap(event => event.type === 'step/start' ? [event.data.step] : [])).toEqual([1, 2])
+    expect(events.flatMap(event => event.type === 'assistant/message' ? [event.data.step] : [])).toEqual([2])
+    expect(events.find(event => event.type === 'turn/end')?.data).toMatchObject({ reason: { kind: 'completed' } })
   })
 
   it('lets cancellation win over a retry action', async () => {
