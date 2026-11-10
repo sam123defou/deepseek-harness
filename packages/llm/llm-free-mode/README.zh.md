@@ -27,7 +27,7 @@ kind: "package-reference"
 
 ### 启用免费模式
 
-在 home patch（`$DSH_HOME/cordis.patch.yml`，所有 profile 都会应用，包括 `free-check`）中设置 `llm-free-mode` 条目的 Config。列出的每个提供方还必须在 `llm-pi-ai` 条目中保持有界重试和较短的流超时：
+在 home patch（`$DSH_HOME/cordis.patch.yml`，所有 profile 都会应用，包括 `free-check`）中设置 `llm-free-mode` 条目的 Config。列出的每个提供方还必须在 `llm-pi-ai` 条目中保持有界重试和较短的流超时，并在 `models` 下列出每条路由的模型：未列出模型时，`free-check` 无法读取该提供方的目录和配额，会报告为 `unknown`，但请求仍可运行。
 
 ```yaml
 - id: llm-free-mode
@@ -52,6 +52,9 @@ kind: "package-reference"
         retryPolicy:
           mode: normal
           maxRetries: 1
+        models:
+          - id: google/gemma-4-31b-it:free
+            contextWindow: 262144
 ```
 
 OpenRouter 路由必须以 `:free` 结尾或等于 `openrouter/free`。其他提供方需要 `freeTierConfirmed: true`，因为只有账户所有者能确认它不会计费。`enabled: false` 移除守卫和故障切换，并保留 `routes`。所有字段都是 volatile 字段，因此修改后无需重新加载即可生效；`settings.yaml` 中原有的 `llm-free-mode:` 段会被一次性导入该条目。

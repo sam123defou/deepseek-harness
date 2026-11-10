@@ -27,7 +27,7 @@ English | [中文](README.zh.md)
 
 ### Enable free mode
 
-Set the `llm-free-mode` entry's Config in the home patch, `$DSH_HOME/cordis.patch.yml`, which every profile applies, including `free-check`. Each listed provider must also keep bounded retries and a short stream timeout in the `llm-pi-ai` entry:
+Set the `llm-free-mode` entry's Config in the home patch, `$DSH_HOME/cordis.patch.yml`, which every profile applies, including `free-check`. Each listed provider must also keep bounded retries and a short stream timeout in the `llm-pi-ai` entry, and list each route's model under `models`: without a listed model, `free-check` cannot read the provider's catalog or quota and reports them `unknown`, although requests still run.
 
 ```yaml
 - id: llm-free-mode
@@ -52,6 +52,9 @@ Set the `llm-free-mode` entry's Config in the home patch, `$DSH_HOME/cordis.patc
         retryPolicy:
           mode: normal
           maxRetries: 1
+        models:
+          - id: google/gemma-4-31b-it:free
+            contextWindow: 262144
 ```
 
 An OpenRouter route must end in `:free` or be `openrouter/free`. Any other provider needs `freeTierConfirmed: true`, because only the account owner can confirm that it does not bill. `enabled: false` removes the guards and the failover and keeps `routes`. Every field is volatile, so an edit applies without a reload, and a former `llm-free-mode:` section of `settings.yaml` is imported into this entry once.
